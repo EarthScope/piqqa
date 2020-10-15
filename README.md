@@ -43,7 +43,7 @@ become available, you can update PIQQA by typing:
 
 ```
 cd piqqa
-git pull origin master
+git pull origin main
 ```
 
 ### Install the Anaconda Environment
