@@ -5,6 +5,8 @@ Created on Aug 18, 2020
 
 @author: laura
 '''
+
+version = 'v1.0.0'
     
 import pandas as pd
 import reportUtils
@@ -33,7 +35,7 @@ if (len(sys.argv) == 1) or (sys.argv[1] == '--h') or (sys.argv[1] == '-h'):
             options available at http://service.iris.edu/mustang/noise-spectrogram/1/
         --includeoutliers=: whether to include outliers in the boxplots, True/False; defaults to False
         --spectralrange=: power range to use in the PDFs and spectrograms, comma separated values:  min, max; defaults depend on channel type
-    
+        --basemap=: the name of the basemap to be used for the map; defaults to 'open-street-map'
     If PIQQA is not working as expected, ensure that the conda environment is activated
     '''
     quit(helpText)
@@ -600,11 +602,11 @@ table {
         f.write('<hr style="width:200;text-align:left;margin-left:2;color:lightgray">')
         f.write('<i>Covering %s to %s</i><br>' % (startDate, endDate));
         today =  datetime.datetime.today().strftime('%B %d, %Y');
-        f.write('<i>Issued ' + str(today) + '</i><br>');
+        f.write('<i>Issued on %s using %s </i><br>' % (str(today), version));
         f.write('<hr style="width:200;text-align:left;margin-left:2;color:lightgray">')
         
         f.write('<br>')
-        intro = '''PLACEHOLDER TEXT: This report is intended as a quick overview of the overall health of the network. 
+        intro = '''This report is intended as a quick overview of the quality of the data archived for the specified network. 
         That includes boxplot summary views of selected metrics, PDFs, and spectrograms. It is recommended
         that users may benefit from a more thorough quality assurance inspection of the data, especially if anything
         suspicious arises from this report.  
@@ -654,7 +656,7 @@ table {
         f.write("<a name='boxplots'></a> <h2>Metric Boxplots</h2>")
         
         boxplotIntro = '''
-        PLACEHOLDER TEXT: Boxplots are generated using the Z component for each channel group (for example, BHZ, HHZ, HNZ, etc) and for each metric included in the report.
+        Boxplots are generated using the Z component for each channel group (for example, BHZ, HHZ, HNZ, etc) and for each metric included in the report.
         Each metric boxplot is ordered by the median value of the Z component.  <br><br>
         '''
         try: 
@@ -683,7 +685,7 @@ table {
         f.write("<p></p>");
         f.write("<h3>Explore the Metrics</h3>")
         
-        f.write("<p>PLACEHOLDER TEXT: MUSTANG is the Quality Assurance system at the IRIS DMC. It contains around 45 metrics related to the quality of data in the archives there.\n\n")
+        f.write("<p>MUSTANG is the Quality Assurance system at the IRIS DMC. It contains around 45 metrics related to the quality of data in the archives there.\n\n")
         f.write("The majority of metrics are available via the <a href=\"http://service.iris.edu/mustang/measurements/1/\" target=\"_blank\">measurements web service.</a>\n\n")
         f.write("To learn more about the metrics, navigate to the measurements service Service Interface page and hit the red \"Current List of all metrics\" for a brief description and links to more detailed documentation.\n\n")
         
