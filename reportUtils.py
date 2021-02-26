@@ -9,15 +9,63 @@ from io import StringIO
 import pandas as pd
 import numpy as np
 import time
+from matplotlib.contour import ClabelText
 
+def getAvailaility(snclqs, startDate, endDate, tolerance):
+    
+    availabilityDF = pd.DataFrame()
+    services = []
+    for snclq in snclqs:
+        snclqList = snclq.split('.')
+        n =snclqList[0]
+        s = snclqList[1]
+        l = snclqList[2]
+        if l == '':
+            luse = '--'
+        else:
+            luse = l
+        c = snclqList[3]
+        q = snclqList[4]
+        
+        
+        if q == "M":
+            service = "fdsnws"
+        elif q == "D":
+            service = "ph5ws"
+        
+        if service not in services:
+            services.append(service)
+            
+        URL = f'http://service.iris.edu/{service}/availability/1/query?format=text&' \
+              f'net={n}&sta={s}&loc={luse}&cha={c}&quality={q}&' \
+              f'starttime={startDate}&endtime={endDate}&orderby=nslc_time_quality_samplerate&' \
+              f'mergegaps={tolerance}&includerestricted=true&nodata=404' 
+              
+        tmpDF = pd.read_csv(URL, sep=' ', dtype={'Location': str, 'Station': str}, parse_dates=['Earliest','Latest'])
+        tmpDF['staloc'] = f'{s}.{luse}'
+        try:
+            availabilityDF = availabilityDF.append(tmpDF, ignore_index=True)
+            
+            
+        except:
+            pass
+            
+       
+#     availabilityDF = availabilityDF.apply(lambda x: x.str.strip() if x.dtype == "object" else x)   
+    availabilityDF.rename(columns=lambda x: x.strip().lower(), inplace=True)
+    availabilityDF.rename(columns = {'#network': 'network'}, inplace=True)
+    
+    return availabilityDF, services 
+        
 
 def retrieveMetrics(URL, metric):
     response = requests.get(URL) 
     tempDF = pd.read_csv(StringIO(response.text), header=1)
     tempDF.rename(columns={'target':'snclq'}, inplace=True)
     tempDF['target'] = tempDF['snclq'].apply(lambda x: '.'.join(x.split('.')[0:4]))
-    tempDF['station'] = tempDF['snclq'].apply(lambda x: '.'.join(x.split('.')[1:3]))
-    
+    tempDF['station'] = tempDF['snclq'].apply(lambda x: '.'.join(x.split('.')[1:3]))    ## Because "station" is really "station.location"    
+    tempDF['station'] = [x + '--' if x.endswith('.') else x for x in tempDF['station'] ]
+        
     if (not metric == 'transfer_function') and (not metric == 'orientation_check'):
             tempDF.rename(columns = {'value': metric}, inplace=True)
             tempDF[metric] = tempDF[metric].map(float)
@@ -29,26 +77,30 @@ def retrieveMetrics(URL, metric):
     return tempDF
 
 def addMetricToDF(metric, DF, network, stations, locations, channels, startDate, endDate):
-    print("   " + metric)
+    if not metric== 'ts_percent_availability_total':
+        print(f"   {metric}")
     chanList = list()
     for chan in channels.split(','):
         if len(chan) == 2:
-            chan = chan + "Z"
+            chan = f"{chan}Z,{chan}3"
         if chan == "*":
-            chan = "??Z"
+            chan = "??Z,??3"
         chanList.append(chan)
     
-    URL = "http://service.iris.edu/mustang/measurements/1/query?metric=%s&net=%s&sta=%s&loc=%s&chan=%s&format=text&timewindow=%s,%s&nodata=404" % (metric, network, ','.join(stations), ','.join(locations), ','.join(chanList), startDate, endDate)
-    
+    URL = f"http://service.iris.edu/mustang/measurements/1/query?metric={metric}&net={network}&" \
+          f"sta={','.join(stations)}&loc={','.join(locations)}&chan={','.join(chanList)}" \
+          f'&format=text&timewindow={startDate},{endDate}&nodata=404'
+#     print("TEMP: URL %s" % URL)
     try:
         tempDF = retrieveMetrics(URL, metric)
-    except:
-        print("     --> Unable to get measurements for %s, waiting 5 seconds and trying again" % (metric))
+    except Exception as e:
+        print(f"     --> Unable to get measurements for {metric}, waiting 5 seconds and trying again")
+        print(e)
         time.sleep(5)
         try:
             tempDF = retrieveMetrics(URL, metric)
         except:
-            print("     --> Still unable to get measurements for %s, bypassing" % (metric))
+            print(f"     --> Still unable to get measurements for {metric}, bypassing" )
             tempDF = pd.DataFrame()
     
    
@@ -58,7 +110,7 @@ def addMetricToDF(metric, DF, network, stations, locations, channels, startDate,
         try:
             DF = pd.merge(DF, tempDF, how='outer', left_on=['target','snclq', 'station', 'start', 'end'], right_on=['target','snclq','station', 'start', 'end'])
         except:
-            print("ERROR: Something went wrong with the %s" % metric)
+            print(f"ERROR: Something went wrong with the {metric}")
         
     return DF
         
@@ -75,20 +127,22 @@ def getMetadata(network, stations, locations, channels, startDate, endDate, leve
     chanList = list()
     for chan in channels.split(','):
         if len(chan) == 2:
-            chan = chan + "Z"
+            chan = f"{chan}Z,{chan}3"
         if chan == "*":
-            chan = "??Z"
+            chan = "??Z,??3"
         chanList.append(chan)
      
-    
 
     try:
         for service in ['fdsnws', 'ph5ws']:
             # To prevent needing to know a priori where it's from, try both and only add if attempt is successful
             # Most experiments are one-archive only, but some have been split in the past
             try:
-                stationURL = "http://service.iris.edu/%s/station/1/query?net=%s&sta=%s&loc=%s&cha=%s&starttime=%s&endtime=%s&level=%s&format=text&includecomments=true&nodata=404" % (service, network, ','.join(stations), ','.join(locations), ','.join(chanList), startDate, endDate, level)
-                
+                stationURL = f"http://service.iris.edu/{service}/station/1/query?" \
+                             f"net={network}&sta={','.join(stations)}&loc={','.join(locations)}&cha={','.join(chanList)}&" \
+                             f"starttime={startDate}&endtime={endDate}&level={level}" \
+                             f"&format=text&includecomments=true&nodata=404" 
+
                 if level == 'channel':
                     tmpDF = pd.read_csv(stationURL, sep='|', dtype={' Location ': str})
                     tmpDF.rename(columns=lambda x: x.strip(), inplace=True)
@@ -115,16 +169,16 @@ def getMetadata(network, stations, locations, channels, startDate, endDate, leve
     return stationDF
 
 def retrieveExpectedPDFs(smallestNSLC, startDate, endDate):
-    URL = 'http://service.iris.edu/mustang/noise-pdf-browser/1/availability?target=%s?.*&starttime=%s&endtime=%s&interval=all' % (smallestNSLC,startDate, endDate)
+    URL = f'http://service.iris.edu/mustang/noise-pdf-browser/1/availability?target={smallestNSLC}?.*&starttime={startDate}&endtime={endDate}&interval=all'
 #     print(URL)
     response =  requests.get(URL) 
     if response.text.startswith("Error"):
         # Wait 5 seconds and try again
-        print("--> Error retrieving list of expected PDFs for %s, waiting 5 seconds and trying again" % smallestNSLC)
+        print(f"--> Error retrieving list of expected PDFs for {smallestNSLC}, waiting 5 seconds and trying again")
         time.sleep(5)
         response =  requests.get(URL) 
         if response.text.startswith("Error"):
-            print("--> Unable to retrieve PDF list for %s" % smallestNSLC)
+            print(f"--> Unable to retrieve PDF list for {smallestNSLC}")
             print(response.text)
             expectedTargets = list()
         
@@ -135,11 +189,12 @@ def retrieveExpectedPDFs(smallestNSLC, startDate, endDate):
     return expectedTargets
 
 def getPDF(target, startDate, endDate, spectPowerRange, imageDir):
-    URL = "http://service.iris.edu/mustang/noise-pdf/1/query?target=%s&starttime=%s&endtime=%s&format=plot&plot.interpolation=bicubic&nodata=404&plot.power.min=%s&plot.power.max=%s" % (target, startDate, endDate, spectPowerRange[0], spectPowerRange[1])
-#     URL = "http://service.iris.edu/mustang/noise-pdf/1/query?target=%s&starttime=%s&endtime=%s&format=plot&plot.interpolation=bicubic&nodata=404" % (target, startDate, endDate)
+    URL = f"http://service.iris.edu/mustang/noise-pdf/1/query?target={target}&" \
+          f"starttime={startDate}&endtime={endDate}&format=plot&plot.interpolation=bicubic&nodata=404&" \
+          f"plot.power.min={spectPowerRange[0]}&plot.power.max={spectPowerRange[1]}"
 
     response = requests.get(URL)
-    filename = ("%s/%s_PDF.png" % (imageDir, target)).replace('*','').replace('?','')
+    filename = (f"{imageDir}/{target}_PDF.png").replace('*','').replace('?','')
     
     file = open(filename, "wb")
     file.write(response.content)
@@ -149,9 +204,14 @@ def getPDF(target, startDate, endDate, spectPowerRange, imageDir):
     
 def getSpectrogram(target, startDate, endDate, spectPowerRange, spectColorPalette, imageDir):
     powerRange = ','.join([str(x) for x in spectPowerRange])
-    URL = "http://service.iris.edu/mustang/noise-spectrogram/1/query?target=%s&starttime=%s&endtime=%s&output=power&format=plot&plot.color.palette=%s&plot.powerscale.range=%s&plot.horzaxis=time&plot.time.matchrequest=true&plot.time.tickunit=auto&plot.time.invert=false&plot.powerscale.show=true&plot.powerscale.orientation=horz&nodata=404" % (target, startDate, endDate, spectColorPalette, powerRange)
+    URL = f"http://service.iris.edu/mustang/noise-spectrogram/1/query?target={target}&" \
+          f"starttime={startDate}&endtime={endDate}&output=power&format=plot&plot.color.palette={spectColorPalette}&" \
+          f"plot.powerscale.range={powerRange}&plot.horzaxis=time&plot.time.matchrequest=true&" \
+          f"plot.time.tickunit=auto&plot.time.invert=false&plot.powerscale.show=true&plot.powerscale.orientation=horz&nodata=404" 
+    
+    
     response = requests.get(URL)
-    filename = "%s/%s_spectrogram.png" % (imageDir, target)
+    filename = f"{imageDir}/{target}_spectrogram.png"
     file = open(filename, "wb")
     file.write(response.content)
     file.close()
@@ -195,3 +255,65 @@ def getBoundsZoomLevel(bounds, mapDim):
         return min(max(latZoom, lngZoom, ZOOM_MIN), ZOOM_MAX)
     
     
+def getMetricLabel(metric):
+    metricLabels = {'amplifier_saturation':'flag count (number of occurrences)',
+                     'calibration_signal':'flag count (number of occurrences)',
+                     'clock_locked':'flag count (number of occurrences)',
+                     'cross_talk':'correlation coefficient', # no units
+                     'data_latency':'latency (seconds)',
+                     'dc_offset':'indicator of likelihood of DC offset shift', # no units
+                     'dead_channel_gsn':'indicator',
+                     'dead_channel_lin':'standard deviation of residuals (dB)',
+                     'digital_filter_charging':'flag count (number of occurrences)',
+                     'digitizer_clipping':'flag count (number of occurrences)',
+                     'event_begin':'flag count (number of occurrences)',
+                     'event_end':'flag count (number of occurrences)',
+                     'event_in_progress':'flag count (number of occurrences)',
+                     'feed_latency':'latency (seconds)',
+                     'gap_list':'gap length (seconds)',
+                     'glitches':'flag count (number of occurrences)',
+                     'max_gap':'maximum gap length (seconds)',
+                     'max_overlap':'overlap length (seconds)',
+                     'max_range':'maximum amplitude range, windowed (counts)',
+                     'max_stalta':'short-term average / long-term average', # no units
+                     'missing_padded_data':'flag count (number of occurrences)',
+                     'num_gaps':'gap count (number of occurrences)',
+                     'num_overlaps':'overlap count (number of occurrences)',
+                     'num_spikes':'outlier count (number of occurrences)',
+                     'pct_above_nhnm':'PDF matrix above New High Noise Model (%)',
+                     'pct_below_nlnm':'PDF matrix below New Low Noise Model (%)',
+                     'percent_availability':'availability (%)',
+                     'polarity_check':'maximum cross-correlation function', # no units
+                     'pressure_effects':'zero-lag cross-correlation function', # no units
+                     'sample_max':'maximum amplitude (counts)',
+                     'sample_mean':'mean amplitude (counts)',
+                     'sample_median':'median amplitude (counts)',
+                     'sample_min':'minimum amplitude (counts)',
+                     'sample_rate_channel':'indicator',
+                     'sample_rate_resp':'indicator',
+                     'sample_rms':'root-mean-square variance (counts)',
+                     'scale_corrected_sample_rms':'scaled by sensitivity, root-mean-squared variance',
+                     'sample_snr':'signal-to-noise ratio', # no units
+                     'sample_unique':'unique sample values (number of occurrences)',
+                     'spikes':'flag count (number of occurrences)',
+                     'suspect_time_tag':'flag count (number of occurrences)',
+                     'telemetry_sync_error':'flag count (number of occurrences)',
+                     'timing_correction':'flag count (number of occurrences)',
+                     'timing_quality':'average timing quality (%)',
+                     'total_latency':'latency (seconds)',
+                     'ts_num_gaps':'gap count (number of occurrences)',
+                     'ts_num_gaps_total':'gap count (number of occurrences)',
+                     'ts_max_gap':'maximum gap length (seconds)',
+                     'ts_gap_length':'total gap length (seconds)',
+                     'ts_gap_length_total':'total gap length (seconds)',
+                     'ts_percent_availability':'availability (%)',
+                     'ts_percent_availability_total':'availability (%)',
+                     'ts_channel_up_time':'daily trace segment length (seconds)',
+                     'ts_channel_continuity':'trace segment length (seconds)',
+                     'gain_ratio':'data/metadata gain ratio', # no units
+                     'phase_diff':'data-metadata phase difference (degrees)',
+                     'ms_coherence':'coherence function', # no units
+                     }
+    
+    labelText = metricLabels[metric]
+    return labelText
