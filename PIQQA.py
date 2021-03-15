@@ -7,7 +7,7 @@ Created on Aug 18, 2020
 '''
 
 # version = 'v1.0'
-version = 'v. 0.2'
+version = 'v. 0.3'
 
 import reportUtils
 
@@ -1133,7 +1133,7 @@ if doReport:
     
     
     try:
-        availabilityOutroText = 'To view the availbility numbers used to create the availability plot(s), see:'
+        availabilityOutroText = 'To view the availability numbers used to create the availability plot(s), see:'
     
         for service in services:
             serviceLink = f'http://service.iris.edu/{service}/availability/1/query?format=text&' \
@@ -1144,7 +1144,7 @@ if doReport:
                                     
             availabilityOutroText = f'<br/>{availabilityOutroText} <br/><a href=\"{serviceLink}\" target=\"_blank\">{serviceLink}</a>'
         
-        availabilityOutroText = f'{availabilityOutroText}<br/><br/>To view the metadata information, see: '
+        availabilityOutroText = f'{availabilityOutroText}<br/><br/>To view the channel metadata time extents used, see: '
 
         for service in services:
             serviceLink = f'http://service.iris.edu/{service}/station/1/query?' \
@@ -1161,7 +1161,7 @@ if doReport:
       
     boxPlotIntroText = '''
     Metric Boxplots are generated using the Z component for each channel group (for example, BHZ, HHZ, HNZ, etc.) 
-    and for each metric included in the report. Each metric boxplot is sorted by the median value of the Z component.<br/><br/> 
+    and for each metric included in the report. Each metric boxplot is sorted by the mean value of the Z component.<br/><br/> 
     
     '''
     
@@ -1467,15 +1467,9 @@ if doReport:
             
 
         f.write("<p></p>");
-        
-        
-        
-        
-#         
-#         f.write("<p></p>");
-#         
-#         f.write('    <center><a href=\"./{}\" target="_blank"><img src="{}" width="100%"></a></center><br/>'.format(avFilename, avFilename))
+        f.write("<h3>Explore the Availability Numbers</h3>")
         f.write(availabilityOutroText)
+
         f.write('<br/>')
         f.write('<hr style="width:100%;color:lightgray">')
         f.write('<p style="text-align:center"><a href="#top">Back to Top</a></p>')
