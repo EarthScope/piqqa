@@ -10,8 +10,12 @@ import pandas as pd
 import numpy as np
 import time
 from matplotlib.contour import ClabelText
+import urllib
+import re
 
-def getAvailaility(snclqs, startDate, endDate, tolerance):
+
+
+def getAvailability(snclqs, startDate, endDate, tolerance):
     
     availabilityDF = pd.DataFrame()
     services = []
@@ -40,13 +44,15 @@ def getAvailaility(snclqs, startDate, endDate, tolerance):
               f'net={n}&sta={s}&loc={luse}&cha={c}&quality={q}&' \
               f'starttime={startDate}&endtime={endDate}&orderby=nslc_time_quality_samplerate&' \
               f'mergegaps={tolerance}&includerestricted=true&nodata=404' 
-              
-        tmpDF = pd.read_csv(URL, sep=' ', dtype={'Location': str, 'Station': str}, parse_dates=['Earliest','Latest'])
-        tmpDF['staloc'] = f'{s}.{luse}'
+           
+        try:   
+            tmpDF = pd.read_csv(URL, sep=' ', dtype={'Location': str, 'Station': str}, parse_dates=['Earliest','Latest'])
+            tmpDF['staloc'] = f'{s}.{luse}'
+        except:
+            pass
+        
         try:
             availabilityDF = availabilityDF.append(tmpDF, ignore_index=True)
-            
-            
         except:
             pass
             
@@ -77,7 +83,7 @@ def retrieveMetrics(URL, metric):
     return tempDF
 
 def addMetricToDF(metric, DF, network, stations, locations, channels, startDate, endDate):
-    if not metric== 'ts_percent_availability_total':
+    if not (metric== 'ts_percent_availability_total' or metric == 'percent_availability'):
         print(f"   {metric}")
     chanList = list()
     for chan in channels.split(','):
@@ -90,17 +96,20 @@ def addMetricToDF(metric, DF, network, stations, locations, channels, startDate,
     URL = f"http://service.iris.edu/mustang/measurements/1/query?metric={metric}&net={network}&" \
           f"sta={','.join(stations)}&loc={','.join(locations)}&chan={','.join(chanList)}" \
           f'&format=text&timewindow={startDate},{endDate}&nodata=404'
-#     print("TEMP: URL %s" % URL)
+
+
     try:
         tempDF = retrieveMetrics(URL, metric)
     except Exception as e:
-        print(f"     --> Unable to get measurements for {metric}, waiting 5 seconds and trying again")
-        print(e)
+        if not metric== 'ts_percent_availability_total':
+            print(f"     --> Unable to get measurements for {metric}, waiting 5 seconds and trying again")
+#             print(f"     {e}")
         time.sleep(5)
         try:
             tempDF = retrieveMetrics(URL, metric)
         except:
-            print(f"     --> Still unable to get measurements for {metric}, bypassing" )
+            if not metric== 'ts_percent_availability_total':
+                print(f"     --> Still unable to get measurements for {metric}, bypassing" )
             tempDF = pd.DataFrame()
     
    
@@ -134,36 +143,63 @@ def getMetadata(network, stations, locations, channels, startDate, endDate, leve
      
 
     try:
-        for service in ['fdsnws', 'ph5ws']:
+        # Call Fed Catalog to know what service the network can be retrieved using. 
+        fedURL = f"http://service.iris.edu/irisws/fedcatalog/1/query?" \
+                 f"net={network}&sta={','.join(stations)}&loc={','.join(locations)}&cha={','.join(chanList)}&" \
+                 f"starttime={startDate}&endtime={endDate}" \
+                 f"&format=request&includeoverlaps=false"
+                
+        try:
+            with urllib.request.urlopen(fedURL) as response:
+                    html_content = response.read().decode('utf-8')
+            
+            services = []
+            for ln in html_content.split('\n'):
+                if ln.startswith("STATIONSERVICE="):
+                    serviceURL = ln.split('=')[1]
+                    if 'iris' in serviceURL:
+                        services.append(serviceURL)
+            
+        except Exception as e:
+            print("    ERROR: unable to retrieve fed catalog information about where the data lives - %s " % e)
+        
+        for service in services:
             # To prevent needing to know a priori where it's from, try both and only add if attempt is successful
             # Most experiments are one-archive only, but some have been split in the past
             try:
-                stationURL = f"http://service.iris.edu/{service}/station/1/query?" \
+                stationURL = f"{service}query?" \
                              f"net={network}&sta={','.join(stations)}&loc={','.join(locations)}&cha={','.join(chanList)}&" \
                              f"starttime={startDate}&endtime={endDate}&level={level}" \
                              f"&format=text&includecomments=true&nodata=404" 
 
                 if level == 'channel':
-                    tmpDF = pd.read_csv(stationURL, sep='|', dtype={' Location ': str})
-                    tmpDF.rename(columns=lambda x: x.strip(), inplace=True)
-                    tmpDF.rename(columns = {'#Network': 'Network'}, inplace=True)
-                    tmpDF['Location'] = tmpDF.Location.replace(np.nan, '', regex=True)
-                    tmpDF['Target'] = tmpDF[['Network', 'Station', 'Location','Channel']].apply(lambda x: '.'.join(x.map(str)), axis=1)
-                    tmpDF.columns = tmpDF.columns.str.lower()
-                     
-                    tmpDF['starttime'] = pd.to_datetime(tmpDF['starttime'])
-                    tmpDF['endtime'] = pd.to_datetime(tmpDF['endtime'])
+                    try:
+                        tmpDF = pd.read_csv(stationURL, sep='|', dtype={' Location ': str})
+                        tmpDF.rename(columns=lambda x: x.strip(), inplace=True)
+                        tmpDF.rename(columns = {'#Network': 'Network'}, inplace=True)
+                        tmpDF['Location'] = tmpDF.Location.replace(np.nan, '', regex=True)
+                        tmpDF['Target'] = tmpDF[['Network', 'Station', 'Location','Channel']].apply(lambda x: '.'.join(x.map(str)), axis=1)
+                        tmpDF.columns = tmpDF.columns.str.lower()
+                         
+                        tmpDF['starttime'] = pd.to_datetime(tmpDF['starttime'])
+                        tmpDF['endtime'] = pd.to_datetime(tmpDF['endtime'])
+                        
+                    except Exception as e:
+                        print(f"    ERROR: unable to retrieve channel information from {stationURL}")
                 
                 elif level == 'station': 
-                    tmpDF = pd.read_csv(stationURL, sep='|')
-                    tmpDF.rename(columns=lambda x: x.strip(), inplace=True)
+                    try:
+                        tmpDF = pd.read_csv(stationURL, sep='|')
+                        tmpDF.rename(columns=lambda x: x.strip(), inplace=True)
+                    except:
+                        print(f"    ERROR: unable to retrieve channel information from {stationURL}")
 
             except:
                 tmpDF = pd.DataFrame()
                  
             stationDF = pd.concat([stationDF, tmpDF], ignore_index=True)
     except:
-        print("ERROR: Unable to retrieve metadata")        
+        print("    ERROR: Unable to retrieve metadata")        
         return stationDF
      
     return stationDF
