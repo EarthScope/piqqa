@@ -84,7 +84,7 @@ def retrieveMetrics(URL, metric):
 
 def addMetricToDF(metric, DF, network, stations, locations, channels, startDate, endDate):
     if not (metric== 'ts_percent_availability_total' or metric == 'percent_availability'):
-        print(f"   {metric}")
+        print(f"        Retrieving {metric}")
     chanList = list()
     for chan in channels.split(','):
         if len(chan) == 2:
@@ -97,19 +97,18 @@ def addMetricToDF(metric, DF, network, stations, locations, channels, startDate,
           f"sta={','.join(stations)}&loc={','.join(locations)}&chan={','.join(chanList)}" \
           f'&format=text&timewindow={startDate},{endDate}&nodata=404'
 
-
     try:
         tempDF = retrieveMetrics(URL, metric)
     except Exception as e:
         if not metric== 'ts_percent_availability_total':
-            print(f"     --> Unable to get measurements for {metric}, waiting 5 seconds and trying again")
+            print(f"         --> Unable to get measurements for {metric}, waiting 5 seconds and trying again")
 #             print(f"     {e}")
         time.sleep(5)
         try:
             tempDF = retrieveMetrics(URL, metric)
         except:
             if not metric== 'ts_percent_availability_total':
-                print(f"     --> Still unable to get measurements for {metric}, bypassing" )
+                print(f"         --> Still unable to get measurements for {metric}, bypassing" )
             tempDF = pd.DataFrame()
     
    
@@ -119,7 +118,7 @@ def addMetricToDF(metric, DF, network, stations, locations, channels, startDate,
         try:
             DF = pd.merge(DF, tempDF, how='outer', left_on=['target','snclq', 'station', 'start', 'end'], right_on=['target','snclq','station', 'start', 'end'])
         except:
-            print(f"ERROR: Something went wrong with the {metric}")
+            print(f"    ERROR: Something went wrong with the {metric}")
         
     return DF
         
@@ -144,11 +143,12 @@ def getMetadata(network, stations, locations, channels, startDate, endDate, leve
 
     try:
         # Call Fed Catalog to know what service the network can be retrieved using. 
+        print("        Calling on Fed Catalog")
         fedURL = f"http://service.iris.edu/irisws/fedcatalog/1/query?" \
-                 f"net={network}&sta={','.join(stations)}&loc={','.join(locations)}&cha={','.join(chanList)}&" \
+                 f"net={network}&sta={stations}&loc={locations}&cha={','.join(chanList)}&" \
                  f"starttime={startDate}&endtime={endDate}" \
                  f"&format=request&includeoverlaps=false"
-                
+        
         try:
             with urllib.request.urlopen(fedURL) as response:
                     html_content = response.read().decode('utf-8')
@@ -162,19 +162,21 @@ def getMetadata(network, stations, locations, channels, startDate, endDate, leve
             
         except Exception as e:
             print("    ERROR: unable to retrieve fed catalog information about where the data lives - %s " % e)
+            services = ['http://service.iris.edu/fdsnws/station/1/', 'http://service.iris.edu/ph5ws/station/1/']
         
         for service in services:
             # To prevent needing to know a priori where it's from, try both and only add if attempt is successful
             # Most experiments are one-archive only, but some have been split in the past
             try:
+                print("        Calling on Station Service")
                 stationURL = f"{service}query?" \
-                             f"net={network}&sta={','.join(stations)}&loc={','.join(locations)}&cha={','.join(chanList)}&" \
+                             f"net={network}&sta={stations}&loc={locations}&cha={','.join(chanList)}&" \
                              f"starttime={startDate}&endtime={endDate}&level={level}" \
                              f"&format=text&includecomments=true&nodata=404" 
 
                 if level == 'channel':
                     try:
-                        tmpDF = pd.read_csv(stationURL, sep='|', dtype={' Location ': str})
+                        tmpDF = pd.read_csv(stationURL, sep='|', dtype={' Location ': str, ' Station ': str})
                         tmpDF.rename(columns=lambda x: x.strip(), inplace=True)
                         tmpDF.rename(columns = {'#Network': 'Network'}, inplace=True)
                         tmpDF['Location'] = tmpDF.Location.replace(np.nan, '', regex=True)
@@ -185,14 +187,14 @@ def getMetadata(network, stations, locations, channels, startDate, endDate, leve
                         tmpDF['endtime'] = pd.to_datetime(tmpDF['endtime'])
                         
                     except Exception as e:
-                        print(f"    ERROR: unable to retrieve channel information from {stationURL}")
+                        print(f"    ERROR: Unable to retrieve channel information from {stationURL}")
                 
                 elif level == 'station': 
                     try:
                         tmpDF = pd.read_csv(stationURL, sep='|')
                         tmpDF.rename(columns=lambda x: x.strip(), inplace=True)
                     except:
-                        print(f"    ERROR: unable to retrieve channel information from {stationURL}")
+                        print(f"    ERROR: Unable to retrieve channel information from {stationURL}")
 
             except:
                 tmpDF = pd.DataFrame()
@@ -292,62 +294,63 @@ def getBoundsZoomLevel(bounds, mapDim):
     
     
 def getMetricLabel(metric):
-    metricLabels = {'amplifier_saturation':'flag count (number of occurrences)',
-                     'calibration_signal':'flag count (number of occurrences)',
-                     'clock_locked':'flag count (number of occurrences)',
+    metricLabels = {'amplifier_saturation':'daily flag count \n(number of occurrences)',
+                     'calibration_signal':'daily flag count \n(number of occurrences)',
+                     'clock_locked':'daily flag count \n(number of occurrences)',
                      'cross_talk':'correlation coefficient', # no units
                      'data_latency':'latency (seconds)',
-                     'dc_offset':'indicator of likelihood of DC offset shift', # no units
+                     'dc_offset':'daily indicator of likelihood of \nDC offset shift', # no units
                      'dead_channel_gsn':'indicator',
                      'dead_channel_lin':'standard deviation of residuals (dB)',
-                     'digital_filter_charging':'flag count (number of occurrences)',
-                     'digitizer_clipping':'flag count (number of occurrences)',
-                     'event_begin':'flag count (number of occurrences)',
-                     'event_end':'flag count (number of occurrences)',
-                     'event_in_progress':'flag count (number of occurrences)',
+                     'digital_filter_charging':'daily flag count \n(number of occurrences)',
+                     'digitizer_clipping':'daily flag count \n(number of occurrences)',
+                     'event_begin':'daily flag count \n(number of occurrences)',
+                     'event_end':'daily flag count \n(number of occurrences)',
+                     'event_in_progress':'daily flag count \n(number of occurrences)',
                      'feed_latency':'latency (seconds)',
-                     'gap_list':'gap length (seconds)',
-                     'glitches':'flag count (number of occurrences)',
-                     'max_gap':'maximum gap length (seconds)',
-                     'max_overlap':'overlap length (seconds)',
-                     'max_range':'maximum amplitude range, windowed (counts)',
-                     'max_stalta':'short-term average / long-term average', # no units
-                     'missing_padded_data':'flag count (number of occurrences)',
-                     'num_gaps':'gap count (number of occurrences)',
-                     'num_overlaps':'overlap count (number of occurrences)',
-                     'num_spikes':'outlier count (number of occurrences)',
-                     'pct_above_nhnm':'PDF matrix above New High Noise Model (%)',
-                     'pct_below_nlnm':'PDF matrix below New Low Noise Model (%)',
-                     'percent_availability':'availability (%)',
-                     'polarity_check':'maximum cross-correlation function', # no units
-                     'pressure_effects':'zero-lag cross-correlation function', # no units
-                     'sample_max':'maximum amplitude (counts)',
-                     'sample_mean':'mean amplitude (counts)',
-                     'sample_median':'median amplitude (counts)',
-                     'sample_min':'minimum amplitude (counts)',
-                     'sample_rate_channel':'indicator',
-                     'sample_rate_resp':'indicator',
-                     'sample_rms':'root-mean-square variance (counts)',
-                     'scale_corrected_sample_rms':'scaled by sensitivity, root-mean-squared variance',
+                     'gap_list':'daily gap length \n(seconds)',
+                     'glitches':'daily flag count \n(number of occurrences)',
+                     'max_gap':'daily maximum gap length \n(seconds)',
+                     'max_overlap':'daily overlap length \n(seconds)',
+                     'max_range':'daily maximum amplitude range, \nwindowed (counts)',
+                     'max_stalta':'daily \nshort-term average / long-term \naverage', # no units
+                     'missing_padded_data':'daily flag count \n(number of occurrences)',
+                     'num_gaps':'daily gap count \n(number of occurrences)',
+                     'num_overlaps':'daily overlap count \n(number of occurrences)',
+                     'num_spikes':'daily outlier count \n(number of occurrences)',
+                     'pct_above_nhnm':'daily PDF matrix above \nNew High Noise Model (%)',
+                     'pct_below_nlnm':'daily PDF matrix below \nNew Low Noise Model (%)',
+                     'percent_availability':'daily availability (%)',
+                     'polarity_check':'maximum cross-correlation \nfunction', # no units
+                     'pressure_effects':'daily zero-lag \ncross-correlation function', # no units
+                     'sample_max':'daily maximum amplitude \n(counts)',
+                     'sample_mean':'daily mean amplitude \n(counts)',
+                     'sample_median':'daily median amplitude \n(counts)',
+                     'sample_min':'daily minimum amplitude \n(counts)',
+                     'sample_rate_channel':'daily indicator',
+                     'sample_rate_resp':'daily indicator',
+                     'sample_rms':'daily root-mean-square variance (counts)',
+                     'scale_corrected_sample_rms':'daily root-mean-squared variance,\nscaled by sensitivity',
                      'sample_snr':'signal-to-noise ratio', # no units
-                     'sample_unique':'unique sample values (number of occurrences)',
-                     'spikes':'flag count (number of occurrences)',
-                     'suspect_time_tag':'flag count (number of occurrences)',
-                     'telemetry_sync_error':'flag count (number of occurrences)',
-                     'timing_correction':'flag count (number of occurrences)',
-                     'timing_quality':'average timing quality (%)',
+                     'sample_unique':'daily unique sample values \n(number of occurrences)',
+                     'spikes':'daily flag count \n(number of occurrences)',
+                     'suspect_time_tag':'daily flag count \n(number of occurrences)',
+                     'telemetry_sync_error':'daily flag count \n(number of occurrences)',
+                     'timing_correction':'daily flag count \n(number of occurrences)',
+                     'timing_quality':'daily average timing quality (%)',
                      'total_latency':'latency (seconds)',
-                     'ts_num_gaps':'gap count (number of occurrences)',
-                     'ts_num_gaps_total':'gap count (number of occurrences)',
-                     'ts_max_gap':'maximum gap length (seconds)',
-                     'ts_gap_length':'total gap length (seconds)',
+                     'ts_num_gaps':'daily gap count \n(number of occurrences)',
+                     'ts_num_gaps_total':'gap count \n(number of occurrences)',
+                     'ts_max_gap':'daily maximum gap length \n(seconds)',
+                     'ts_max_gap_total':'maximum gap length \n(seconds)',
+                     'ts_gap_length':'daily total gap length \n(seconds)',
                      'ts_gap_length_total':'total gap length (seconds)',
-                     'ts_percent_availability':'availability (%)',
+                     'ts_percent_availability':'daily availability (%)',
                      'ts_percent_availability_total':'availability (%)',
-                     'ts_channel_up_time':'daily trace segment length (seconds)',
+                     'ts_channel_up_time':'daily trace segment length \n(seconds)',
                      'ts_channel_continuity':'trace segment length (seconds)',
                      'gain_ratio':'data/metadata gain ratio', # no units
-                     'phase_diff':'data-metadata phase difference (degrees)',
+                     'phase_diff':'data-metadata phase difference \n(degrees)',
                      'ms_coherence':'coherence function', # no units
                      }
     

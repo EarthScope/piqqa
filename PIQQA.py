@@ -7,7 +7,7 @@ Created on Aug 18, 2020
 '''
 
 # version = 'v1.0'
-version = 'v. 0.4'
+version = 'v. 0.5'
 
 import reportUtils
 
@@ -25,6 +25,7 @@ import shutil
 
 
 def checkAvailability(thisNetwork, thisStation, thisLocation, thisChannel, thisStart, thisEnd):
+        
         thisAvDF = reportUtils.addMetricToDF('ts_percent_availability_total', pd.DataFrame(), thisNetwork, [thisStation], [thisLocation], thisChannel, thisStart, thisEnd)
 
         if thisAvDF.empty:
@@ -37,19 +38,23 @@ def checkAvailability(thisNetwork, thisStation, thisLocation, thisChannel, thisS
             thisAvDF = reportUtils.addMetricToDF('percent_availability', pd.DataFrame(), thisNetwork, [thisStation], [thisLocation], thisChannel, thisStart, thisEnd)
           
             if thisAvDF.empty:
-                print(f'         INFO: unable to retrieve values for requested channels, bypassing')
+                print(f'         WARNING: Unable to retrieve values for requested channels, bypassing')
                 thisAvDF.rename(columns={"percent_availability": "availability"}, inplace=True)
                 
             else:
-                print("         Note: Using an average of percent_availability instead of ts_percent_availability_total")
+                print("            Note: Using an average of percent_availability instead of ts_percent_availability_total")
                 
                 thisAvDF = thisAvDF.groupby(['snclq','target','station']).mean().reset_index()
                 thisAvDF.rename(columns={"percent_availability": "availability"}, inplace=True)
         else:
             thisAvDF.rename(columns={"ts_percent_availability_total": "availability"},  inplace=True)
         
+        try:
+            thisPctAvail = thisAvDF['availability'].values[0]
+        except:
+            thisPctAvail = 0
+            print(f"**** WARNING: No Percent Availability found for {thisNetwork.thisStation.thisLocation.thisChannel} - are services down? ****")
         
-        thisPctAvail = thisAvDF['availability'].values[0]
         
         return thisPctAvail
 
@@ -61,180 +66,213 @@ def doAvailability(splitPlots, startDate, endDate, network, stations, locations,
     avFilesDictionary = {}  # collects plot filenames
     topStationsDict = {}    # list of stations in top X (default 15) for channel group, or all stations if the channel group is small 
     services_used = list()  # used to know which services to link to at the bottom of the availability section
+#     services = ['fdsnws']
 #     avDictionary = {}       # earliest and latest dates for each target, as well as the ts_percent_availabilty_total between those two dates.  
     
     totalElapsedTime = (datetime.datetime.fromisoformat(endDate).timestamp() -  datetime.datetime.fromisoformat(startDate).timestamp())/ 86400
     gapBuffer = 0.001    # if the gap is smaller than this percent of the total elapsed time, then it will be plotted as this percent of the total time
 
 
-    # First, get availability from ts_availability_total so that it's easy to choose the top- and bottommost stations
-    idoAvailability = 1
-    availabilityType = "ts_percent_availability_total"
-    
-    pctAvDF = pd.DataFrame()
-    pctAvDF = reportUtils.addMetricToDF('ts_percent_availability_total', pctAvDF, network, stations, locations, channels, startDate, endDate)
-    
-    if pctAvDF.empty:
-#         print(f"    INFO: unable to retrieve values for ts_percent_availability_total, trying percent_availability")
-        pctAvDF = reportUtils.addMetricToDF('percent_availability', pctAvDF, network, stations, locations, channels, startDate, endDate)
-        
-        if pctAvDF.empty:
-            print(f'    INFO: unable to retrieve values for requested channels, bypassing')
-            idoAvailability = 0
-            
-        else:
-            print("    INFO: Using an average of percent_availability instead of ts_percent_availability_total")
-            availabilityType = "percent_availability"
-            
-            pctAvDF = pctAvDF.groupby(['snclq','target','station']).mean().reset_index()
-            pctAvDF.rename(columns={"percent_availability": "availability"}, inplace=True)
-    else:
-        pctAvDF.rename(columns={"ts_percent_availability_total": "availability"},  inplace=True)
-            
-       
-       
-        
-#     else:
-    if idoAvailability == 1:
-        pctAvDF['slc'] = [ x + '.' + y for x, y  in zip([ i for i in pctAvDF['station'] ], [ i.split('.')[-1] for i in pctAvDF['target'] ]) ]  
-    
-        pctAvDF.sort_values(['availability','station'], inplace=True, ascending=[False,True])
-        pctAvDF = pctAvDF.reset_index(drop=True)
-        
-        actualChannels = sorted(list(set([x[3] for x in pctAvDF['target'].str.split('.')])))
-                
-        
-        for channelGroup in actualChannels:
-            tmpDF = pctAvDF[pctAvDF['target'].str.endswith(channelGroup)]
-                    
-            stationList = sorted(list(set(tmpDF.slc)))
-            nsta = len(stationList)
-            
-            if nsta > nBoxPlotSta:
-                splitPlots = 1
-#                 nTop = int(nBoxPlotSta / 2)
-#                 nBottom = int(nBoxPlotSta - nTop)
-           
-                topStations = tmpDF.iloc[:nTop,:]
-                bottomStations = tmpDF.iloc[-nBottom:,:]
-                
-        
-                height = max(min(0.3*nsta, 0.3*nBoxPlotSta), 2)
-                width = 15
-                f, (ax1, ax2) = plt.subplots(2, 1, sharex=True, figsize=(width, height))
-        
-                
-                ## FOR each of the top and bottom station.locations, plot up:
-                ##    1. the metadata extends for the sta.loc
-                ##    2. the data extents for the sta.loc
-                ##    3. the gap extents for the sta.loc
-                
-                topStationsAvDF, services = reportUtils.getAvailability(topStations['snclq'], startDate, endDate, tolerance)
-                for service in services:
-                    if service not in services_used:
-                        services_used.append(service)
-                
-                
-                
-                topStationList = topStations['station'].tolist()
-                topLabels = [f'{a} ({b:.3f}%)' for a, b in zip(topStations['station'], topStations['availability']) ]
-        
-                topStationsDict[channelGroup] = topStationList
-        
-                datalines = []
-                metadatalines = []
-                gaplines = []
-                stn = 0
-                for station in topStationList:
-                    # data extents and gaps extents
-                    thisData = topStationsAvDF[topStationsAvDF['staloc'] == str(station)]
-                    
-                    
-                    if len(thisData.index) > 1:
-                        # then there are gaps
-                        doGaps = True
-                        thisGap = []
-                        pullThis = 'first'
-                    else:
-                        doGaps = False
-                        
-                    for idx,line in thisData.iterrows():
-                        datalines.append( [ ( mpl.dates.date2num(line['earliest']), stn ) , ( mpl.dates.date2num(line['latest']), stn ) ] )
-                        
-                        if doGaps:
-                            if pullThis == 'first':
-                                thisGap.append(( mpl.dates.date2num(line['latest']), stn ))
-                                
-                                pullThis = 'second'
-                            else:
-                                
-                                # If the gap is too small, we can't see it. So force it to be a bit bigger.
-                                gapStart = thisGap[0][0]
-                                gapEnd = mpl.dates.date2num(line['earliest'])
-                                
-                                if gapEnd - gapStart < totalElapsedTime * gapBuffer:
-                                    thisGap.append(( gapStart + (totalElapsedTime * gapBuffer), stn )) 
-                                else:
-                                    
-                                    thisGap.append( ( gapEnd, stn ) ) 
-                                gaplines.append(thisGap) 
-                                
-                                thisGap = []
-                                thisGap.append(( mpl.dates.date2num(line['latest']), stn ))
-                                                            
-                    # metadata extents
-                    thisStation = station.split('.')[0]
-                    thisLocation = station.split('.')[1]
-                    if thisLocation == "":
-                        thisLocation = '--'
-                    thisMetadata = reportUtils.getMetadata(network, [thisStation], [thisLocation], channels, startDate, endDate, "channel")
-                    for idx,line in thisMetadata.iterrows():
-                        metadatalines.append( [ ( mpl.dates.date2num(line['starttime']), stn ) , ( mpl.dates.date2num(line['endtime']), stn ) ] )
-                        
-                    stn += 1
-        
-        
-                       
-                DataLines = mc.LineCollection(datalines, linewidths=4, color=(.3,.5,.7,1)) 
-                MetadataLines = mc.LineCollection(metadatalines, linewidths=10, color=(.9,.9,.9,1)) 
-                GapLines = mc.LineCollection(gaplines, linewidths=12, color=(0,0,0,1))
-                       
-                ax1.add_collection(MetadataLines)
-                ax1.add_collection(DataLines)
-                ax1.add_collection(GapLines)
-                ax1.autoscale()
-                ax1.invert_yaxis()
-                ax1.xaxis.set_minor_locator(mpl.ticker.AutoMinorLocator())
-                ax1.set_yticks(np.arange(nTop))
-                ax1.set_yticklabels(topLabels)
+    ## Get all channel-level metadata
+    print("    INFO: Retrieving Metadata")
+    allMetadataDF = reportUtils.getMetadata(network, stations, locations, channels, startDate, endDate, "channel")
 
-                ax1.set_xlim([mpl.dates.datestr2num(startDate), mpl.dates.datestr2num(endDate)] )
-                 
-                ax1.xaxis.grid(True, which='both', color='k', linestyle=':')
-                    
-                 
-                # Do it again for the lowest stations
-                bottomStationsAvDF, services = reportUtils.getAvailability(bottomStations['snclq'], startDate, endDate, tolerance)
-                for service in services:
-                    if service not in services_used:
-                        services_used.append(service)
-                bottomStationList = bottomStations['station'].tolist()
-                bottomLabels = [f'{a} ({b:.3f}%)' for a, b in zip(bottomStations['station'], bottomStations['availability']) ]
+    actualChannels = sorted(list(set(allMetadataDF['channel'])))
+
+    ## Loop over the channel groups
+    for channelGroup in actualChannels:
+        availabilityType = "ts_percent_availability_total"
+        ## Narrow down allMetadataDF to match just this channel group
+        tmpMetadataDF = allMetadataDF[allMetadataDF['channel'] == channelGroup]
+
+        ## Get percent availability numbers for all targets for this channelGroup so that you can narrow it down to the top/bottom available 
+        # First try to use ts_percent_availability_total
+        pctAvDF = pd.DataFrame()
         
-                datalines = []
-                metadatalines = []
-                gaplines = []
+        print(f"    INFO: Retrieving percent availability information for {channelGroup}")
+        try:
+            pctAvDF = reportUtils.addMetricToDF('ts_percent_availability_total', pctAvDF, network, stations, locations, channelGroup, startDate, endDate)
+        except:
+            print(f"ERROR: Trouble accessing ts_percent_availability_total")
+
+
+        if not pctAvDF.empty:
+            pctAvDF.rename(columns={"ts_percent_availability_total": "availability"}, inplace=True)
+
+        # If not all targets have ts_percent_availability_total, then try getting it from percent_availability
+
+        doPctAvail = False
+        if pctAvDF.empty:
+            doPctAvail = True
+        elif len(tmpMetadataDF.target.unique()) > len(pctAvDF.target.unique()):
+            doPctAvail = True
+        
+        if doPctAvail:
+            pctAvDF2 = pd.DataFrame()
+            pctAvDF2 = reportUtils.addMetricToDF('percent_availability', pctAvDF2, network, stations, locations, channelGroup, startDate, endDate)
+            
+            
+            if pctAvDF2.empty:
+                print(f"**** WARNING: No Percent Availability found for {channelGroup} - services could be down or metrics may not exist for data yet ****")
+                continue
+            
+            
+            pctAvDF2 = pctAvDF2.groupby(['snclq','target','station']).mean().reset_index()
+            pctAvDF2.rename(columns={"percent_availability": "availability"}, inplace=True)
+            
+            # All channels be sourced from the same percent availability type within a plot, so if we had to use percent_availability at all
+            # it should replace any ts_percent_availability_total values that we may have been able to retrieve. 
+            pctAvDF = pctAvDF2
+            availabilityType = "percent_availability"
+
+            # If there are more targets in the metadata dataframe than we have percent availabilty for, let the user know. 
+            if len(pctAvDF.target.unique()) < len(tmpMetadataDF.target.unique()):
+                print(f"    WARNING: Unable to retrieve percent availability information for {len(tmpMetadataDF.target.unique()) - len(pctAvDF.target.unique())} stations:")
+                avStations = pctAvDF.target.unique()
+                missingStations = tmpMetadataDF[~tmpMetadataDF['target'].isin(avStations)].target.values
+                print(f"        {','.join(missingStations)}")
+        
                 
-                stn = 0
-                for station in bottomStationList:
+        # At this point we have the percent availability and metadata extents for all targets in this channelGroup
+        # Next: order the targets by percent availability to select the greatest and least available stations. 
+        try:
+            pctAvDF['slc'] = [ x + '.' + y for x, y  in zip([ i for i in pctAvDF['station'] ], [ i.split('.')[-1] for i in pctAvDF['target'] ]) ]  
+            pctAvDF.sort_values(['availability','station'], inplace=True, ascending=[False,True])
+            pctAvDF = pctAvDF.reset_index(drop=True)
+        except:
+            print("ERROR: Unable to use percent availability dataframe")
+            
         
-                    # data extents and gaps extents
-                    try:
-                        thisData = bottomStationsAvDF[bottomStationsAvDF['staloc'] == str(station)]
-                    except:
-                        thisData = pd.DataFrame() # create an empty dataframe so that it can "loop over" the empty frame below
-#                         print(f"WARNING: no availability found for station {str(station)}")
+        stationList = sorted(list(set(pctAvDF.slc)))    # Only used to get the number of stations, the list isn't actually used otherwise
+        nsta = len(stationList)
+        
+        if nsta > nBoxPlotSta:
+            splitPlots = 1
+       
+            topStations = pctAvDF.iloc[:nTop,:]
+            bottomStations = pctAvDF.iloc[-nBottom:,:]
+            print("TEMP: bottomStations %s" % bottomStations)
+            
+            height = max(min(0.3*nsta, 0.3*nBoxPlotSta), 2)
+            width = 15
+            f, (ax1, ax2) = plt.subplots(2, 1, sharex=True, figsize=(width, height))
+        
+            ## FOR each of the top and bottom station.locations, plot up:
+            ##    1. the metadata extends for the sta.loc
+            ##    2. the data extents for the sta.loc
+            ##    3. the gap extents for the sta.loc
+        
+            ## will need to subset the existing percetn availability and station metadata dataframes to just the top and bottom stations
+            ## will also need to grab the availability extents for those targets
+            
+                
+            topStationsAvDF, services = reportUtils.getAvailability(topStations['snclq'], startDate, endDate, tolerance)
+            for service in services:
+                if service not in services_used:
+                    services_used.append(service)
                     
+            topStationList = topStations['station'].tolist()
+            topLabels = [f'{a} ({b:.3f}%)' for a, b in zip(topStations['station'], topStations['availability']) ]
+    
+            topStationsDict[channelGroup] = topStationList
+    
+            datalines = []
+            metadatalines = []
+            gaplines = []
+            stn = 0
+            for station in topStationList:
+                
+                # data extents and gaps extents
+                thisData = topStationsAvDF[topStationsAvDF['staloc'] == str(station)]
+                if len(thisData.index) > 1:
+                    # then there are gaps
+                    doGaps = True
+                    thisGap = []
+                    pullThis = 'first'
+                else:
+                    doGaps = False
+            
+                for idx,line in thisData.iterrows():
+                    datalines.append( [ ( mpl.dates.date2num(line['earliest']), stn ) , ( mpl.dates.date2num(line['latest']), stn ) ] )
+                    
+                    if doGaps:
+                        if pullThis == 'first':
+                            thisGap.append(( mpl.dates.date2num(line['latest']), stn ))
+                            
+                            pullThis = 'second'
+                        else:
+                            
+                            # If the gap is too small, we can't see it. So force it to be a bit bigger.
+                            gapStart = thisGap[0][0]
+                            gapEnd = mpl.dates.date2num(line['earliest'])
+                            
+                            if gapEnd - gapStart < totalElapsedTime * gapBuffer:
+                                thisGap.append(( gapStart + (totalElapsedTime * gapBuffer), stn )) 
+                            else:
+                                
+                                thisGap.append( ( gapEnd, stn ) ) 
+                            gaplines.append(thisGap) 
+                            
+                            thisGap = []
+                            thisGap.append(( mpl.dates.date2num(line['latest']), stn ))
+                
+                # metadata extents
+                thisStation = station.split('.')[0]
+                thisLocation = station.split('.')[1]
+                if thisLocation == "--":
+                    thisLocation = ''
+                thisMetadata = tmpMetadataDF[(tmpMetadataDF['station']==thisStation) & (tmpMetadataDF['location']==thisLocation)]
+                for idx,line in thisMetadata.iterrows():
+                    metadatalines.append( [ ( mpl.dates.date2num(line['starttime']), stn ) , ( mpl.dates.date2num(line['endtime']), stn ) ] )
+                            
+                
+                
+                
+                stn += 1
+                
+            DataLines = mc.LineCollection(datalines, linewidths=4, color=(.3,.5,.7,1)) 
+            MetadataLines = mc.LineCollection(metadatalines, linewidths=10, color=(.9,.9,.9,1)) 
+            GapLines = mc.LineCollection(gaplines, linewidths=12, color=(0,0,0,1))
+                   
+            ax1.add_collection(MetadataLines)
+            ax1.add_collection(DataLines)
+            ax1.add_collection(GapLines)
+            ax1.autoscale()
+            ax1.invert_yaxis()
+            ax1.xaxis.set_minor_locator(mpl.ticker.AutoMinorLocator())
+            ax1.set_yticks(np.arange(nTop))
+            ax1.set_yticklabels(topLabels)
+
+            ax1.set_xlim([mpl.dates.datestr2num(startDate), mpl.dates.datestr2num(endDate)] )
+            ax1.xaxis.grid(True, which='both', color='k', linestyle=':')    
+                
+                
+                
+                
+            ## And again, for the bottom stations
+            bottomStationsAvDF, services = reportUtils.getAvailability(bottomStations['snclq'], startDate, endDate, tolerance)
+            print("TEMP: bottomStationsAvDF %s  " % bottomStationsAvDF)
+            for service in services:
+                if service not in services_used:
+                    services_used.append(service)
+            bottomStationList = bottomStations['station'].tolist()
+            bottomLabels = [f'{a} ({b:.3f}%)' for a, b in zip(bottomStations['station'], bottomStations['availability']) ]
+    
+            datalines = []
+            metadatalines = []
+            gaplines = []
+            
+            stn = 0
+            for station in bottomStationList:
+
+                # data extents and gaps extents
+                print("TEMP: station %s " % station)
+                print("TEMP: bottomStations[bottomStations['station'] == station].availability.values %s" % bottomStations[bottomStations['station'] == station].availability.values)
+                if bottomStations[bottomStations['station'] == station].availability.values == 0:
+                    print("TEMP: No Data for this station, so filling in with blanks")
+                    
+                else:
+                    thisData = bottomStationsAvDF[bottomStationsAvDF['staloc'] == str(station)]
                     if len(thisData.index) > 1:
                         # then there are gaps
                         doGaps = True
@@ -242,22 +280,9 @@ def doAvailability(splitPlots, startDate, endDate, network, stations, locations,
                         pullThis = 'first'
                     else:
                         doGaps = False
-                        
+                
                     for idx,line in thisData.iterrows():
-                        dataStart = mpl.dates.date2num(line['earliest'])
-                        dataEnd = mpl.dates.date2num(line['latest'])
-                        
-                        if (dataEnd - dataStart < totalElapsedTime * gapBuffer) and (not dataEnd - dataStart == 0):
-                            # Then the line might be too small to see, so artificially enlarge it for visibility
-                            datalines.append( [ (dataStart, stn ) , ( dataStart + (totalElapsedTime * gapBuffer), stn ) ] )
-                        else:         
-                            datalines.append( [ (dataStart, stn ) , ( dataEnd, stn ) ] )
-                        
-                        
                         datalines.append( [ ( mpl.dates.date2num(line['earliest']), stn ) , ( mpl.dates.date2num(line['latest']), stn ) ] )
-                        
-                        
-                        
                         
                         if doGaps:
                             if pullThis == 'first':
@@ -279,88 +304,85 @@ def doAvailability(splitPlots, startDate, endDate, network, stations, locations,
                                 
                                 thisGap = []
                                 thisGap.append(( mpl.dates.date2num(line['latest']), stn ))
-                                
-                            
-                    # metadata extents
-                    thisStation = station.split('.')[0]
-                    thisLocation = station.split('.')[1]
-                    if thisLocation == "":
-                        thisLocation = '--'
-                    thisMetadata = reportUtils.getMetadata(network, [thisStation], [thisLocation], channels, startDate, endDate, "channel")
-                    for idx,line in thisMetadata.iterrows():
-                        metaStart = mpl.dates.date2num(line['starttime'])
-                        metaEnd = mpl.dates.date2num(line['endtime'])
-                        if metaEnd - metaStart < totalElapsedTime * gapBuffer:
-                            # Then the line might be too small to see, so artificially enlarge it for visibility
-                            metadatalines.append( [ (metaStart, stn ) , ( metaStart + (totalElapsedTime * gapBuffer), stn ) ] )
-                        else:         
-                            metadatalines.append( [ (metaStart, stn ) , ( metaEnd, stn ) ] )
-                    stn += 1
-        
-        
-                       
-                DataLines = mc.LineCollection(datalines, linewidths=4, color=(.3,.5,.7,1)) 
-                MetadataLines = mc.LineCollection(metadatalines, linewidths=10, color=(.9,.9,.9,1)) 
-                GapLines = mc.LineCollection(gaplines, linewidths=12, color=(0,0,0,1))
-                 
-                ax2.add_collection(MetadataLines)
-                ax2.add_collection(DataLines)
-                ax2.add_collection(GapLines)
-                ax2.autoscale()
-                ax2.invert_yaxis()
-                ax2.set_yticks(np.arange(nTop))
-                ax2.set_yticklabels(bottomLabels)
-                ax2.set_xlim([mpl.dates.datestr2num(startDate), mpl.dates.datestr2num(endDate)] )
                 
-                ax2.xaxis.grid(True, which='both', color='k', linestyle=':')
+                # metadata extents
+                thisStation = station.split('.')[0]
+                thisLocation = station.split('.')[1]
+                if thisLocation == "--":
+                    thisLocation = ''
+                thisMetadata = tmpMetadataDF[(tmpMetadataDF['station']==thisStation) & (tmpMetadataDF['location']==thisLocation)]
+                for idx,line in thisMetadata.iterrows():
+                    metadatalines.append( [ ( mpl.dates.date2num(line['starttime']), stn ) , ( mpl.dates.date2num(line['endtime']), stn ) ] )
+            
+                stn += 1
+            
+            
+            DataLines = mc.LineCollection(datalines, linewidths=4, color=(.3,.5,.7,1)) 
+            MetadataLines = mc.LineCollection(metadatalines, linewidths=10, color=(.9,.9,.9,1)) 
+            GapLines = mc.LineCollection(gaplines, linewidths=12, color=(0,0,0,1))
+             
+            ax2.add_collection(MetadataLines)
+            ax2.add_collection(DataLines)
+            ax2.add_collection(GapLines)
+            ax2.autoscale()
+            ax2.invert_yaxis()
+            ax2.set_yticks(np.arange(nTop))
+            ax2.set_yticklabels(bottomLabels)
+            ax2.set_xlim([mpl.dates.datestr2num(startDate), mpl.dates.datestr2num(endDate)] )
+            
+            ax2.xaxis.grid(True, which='both', color='k', linestyle=':')
+            
+            for nn, ax in enumerate([ax1,ax2]):
+                if totalElapsedTime < 91:
+                    major = mdates.MonthLocator()   # every year
+                    minor = mdates.WeekdayLocator()  # every month
+                    major_fmt = mdates.DateFormatter('%b')
+                    minor_fmt = mdates.DateFormatter('%d')
+                else:
+                    major = mdates.YearLocator()   # every year
+                    minor = mdates.MonthLocator()  # every month
+                    major_fmt = mdates.DateFormatter('%Y')
+                    minor_fmt = mdates.DateFormatter('%b')
+    
+                ax.xaxis.set_major_locator(major)
+                ax.xaxis.set_major_formatter(major_fmt)
+                ax.xaxis.set_minor_locator(minor)
+                ax.xaxis.set_minor_formatter(minor_fmt)
+                ax.tick_params(axis="x", which="both", rotation=45)
+            
                 
-                for nn, ax in enumerate([ax1,ax2]):
-                    if totalElapsedTime < 91:
-                        major = mdates.MonthLocator()   # every year
-                        minor = mdates.WeekdayLocator()  # every month
-                        major_fmt = mdates.DateFormatter('%b')
-                        minor_fmt = mdates.DateFormatter('%d')
-                    else:
-                        major = mdates.YearLocator()   # every year
-                        minor = mdates.MonthLocator()  # every month
-                        major_fmt = mdates.DateFormatter('%Y')
-                        minor_fmt = mdates.DateFormatter('%b')
+            ax1.set_title(f'Availability for {network}, {startDate} to {endDate}')
+            
+            
+            ## Then repeat for the case where they aren't broken up by top/bottom
         
-                    ax.xaxis.set_major_locator(major)
-                    ax.xaxis.set_major_formatter(major_fmt)
-                    ax.xaxis.set_minor_locator(minor)
-                    ax.xaxis.set_minor_formatter(minor_fmt)
-                    ax.tick_params(axis="x", which="both", rotation=45)
-                
+        else:
+        
+            height = max(min(0.3*nsta, 0.3*nBoxPlotSta), 2)
+            width = 15
+            f, ax = plt.subplots(figsize=(width, height))
+    
+            allStationsAvDF, services = reportUtils.getAvailability(pctAvDF['snclq'], startDate, endDate, tolerance)
+            print("TEMP: allStationsAvDF %s " % allStationsAvDF)
+            for service in services:
+                if service not in services_used:
+                    services_used.append(service)
                     
-                ax1.set_title(f'Availability for {network}, {startDate} to {endDate}')
-        
-        
-        
-        
-            else:
-        
-                height = max(min(0.3*nsta, 0.3*nBoxPlotSta), 2)
-                width = 15
-                f, ax = plt.subplots(figsize=(width, height))
-        
-                allStationsAvDF, services = reportUtils.getAvailability(tmpDF['snclq'], startDate, endDate, tolerance)
-                
-                for service in services:
-                    if service not in services_used:
-                        services_used.append(service)
-                        
-                allStationList = tmpDF['station'].tolist()
-                allLabels = [f'{a} ({b:.3f}%)' for a, b in zip(tmpDF['station'], tmpDF['availability']) ]
-                topStationsDict[channelGroup] = allStationList
-                
-                
-                datalines = []
-                metadatalines = []
-                gaplines = []
-                stn = 0
-                for station in allStationList:
-                    # data extents and gaps extents
+            allStationList = pctAvDF['station'].tolist()
+            allLabels = [f'{a} ({b:.3f}%)' for a, b in zip(pctAvDF['station'], pctAvDF['availability']) ]
+            topStationsDict[channelGroup] = allStationList
+            
+            
+            datalines = []
+            metadatalines = []
+            gaplines = []
+            stn = 0
+            for station in allStationList:
+                # data extents and gaps extents
+                if pctAvDF[pctAvDF['station'] == station].availability.values == 0:
+                    print("TEMP: No Data for this station, so filling in with blanks")
+                    
+                else:
                     thisData = allStationsAvDF[allStationsAvDF['staloc'] == str(station)]
                     if len(thisData.index) > 1:
                         # then there are gaps
@@ -369,7 +391,7 @@ def doAvailability(splitPlots, startDate, endDate, network, stations, locations,
                         pullThis = 'first'
                     else:
                         doGaps = False
-                        
+                
                     for idx,line in thisData.iterrows():
                         datalines.append( [ ( mpl.dates.date2num(line['earliest']), stn ) , ( mpl.dates.date2num(line['latest']), stn ) ] )
                         
@@ -393,69 +415,70 @@ def doAvailability(splitPlots, startDate, endDate, network, stations, locations,
                                 
                                 thisGap = []
                                 thisGap.append(( mpl.dates.date2num(line['latest']), stn ))
-                                
-        #                         pullThis = 'second'
                             
-                    # metadata extents
-                    thisStation = station.split('.')[0]
-                    thisLocation = station.split('.')[1]
-                    if thisLocation == "":
-                        thisLocation = '--'
-                    thisMetadata = reportUtils.getMetadata(network, [thisStation], [thisLocation], channels, startDate, endDate, "channel")
-                    for idx,line in thisMetadata.iterrows():
-                        metadatalines.append( [ ( mpl.dates.date2num(line['starttime']), stn ) , ( mpl.dates.date2num(line['endtime']), stn ) ] )
-                        
-                    stn += 1
-        
-        
-                       
-                DataLines = mc.LineCollection(datalines, linewidths=4, color=(.3,.5,.7,1)) 
-                MetadataLines = mc.LineCollection(metadatalines, linewidths=10, color=(.9,.9,.9,1)) 
-                GapLines = mc.LineCollection(gaplines, linewidths=12, color=(0,0,0,1))
-                       
-                ax.add_collection(MetadataLines)
-                ax.add_collection(DataLines)
-                ax.add_collection(GapLines)
-                ax.autoscale()
-                ax.invert_yaxis()
-                ax.xaxis.set_minor_locator(mpl.ticker.AutoMinorLocator())
-                ax.set_yticks(np.arange(nsta))
-                ax.set_yticklabels(allLabels)
-                ax.set_xlim([mpl.dates.datestr2num(startDate), mpl.dates.datestr2num(endDate)] )
-                 
-                ax.xaxis.grid(True, which='both', color='k', linestyle=':')
-                
-        
-                years = mdates.YearLocator()   # every year
-                months = mdates.MonthLocator()  # every month
-                years_fmt = mdates.DateFormatter('%Y')
-                months_fmt = mdates.DateFormatter('%b')
-        
-                ax.xaxis.set_major_locator(years)
-                ax.xaxis.set_major_formatter(years_fmt)
-                ax.xaxis.set_minor_locator(months)
-                ax.xaxis.set_minor_formatter(months_fmt)
-                ax.tick_params(axis="x", which="both", rotation=45)
-                
-                    
-                ax.set_title(f'Availability for {network}, {startDate} to {endDate}')
-        
-            plt.tight_layout()
-            avFilename = f'{imageDir}/{network}_{channelGroup}_availability.png'
+                # metadata extents
+                thisStation = station.split('.')[0]
+                thisLocation = station.split('.')[1]
+                if thisLocation == "--":
+                    thisLocation = ''
+                thisMetadata = tmpMetadataDF[(tmpMetadataDF['station']==thisStation) & (tmpMetadataDF['location']==thisLocation)]
+                for idx,line in thisMetadata.iterrows():
+                    metadatalines.append( [ ( mpl.dates.date2num(line['starttime']), stn ) , ( mpl.dates.date2num(line['endtime']), stn ) ] )
+            
+                stn += 1
+            
+            
+            DataLines = mc.LineCollection(datalines, linewidths=4, color=(.3,.5,.7,1)) 
+            MetadataLines = mc.LineCollection(metadatalines, linewidths=10, color=(.9,.9,.9,1)) 
+            GapLines = mc.LineCollection(gaplines, linewidths=12, color=(0,0,0,1))
+             
+            ax.add_collection(MetadataLines)
+            ax.add_collection(DataLines)
+            ax.add_collection(GapLines)
+            ax.autoscale()
+            ax.invert_yaxis()
+            ax.xaxis.set_minor_locator(mpl.ticker.AutoMinorLocator())
+            ax.set_yticks(np.arange(nsta))
+            ax.set_yticklabels(allLabels)
+            ax.set_xlim([mpl.dates.datestr2num(startDate), mpl.dates.datestr2num(endDate)] )
+             
+            ax.xaxis.grid(True, which='both', color='k', linestyle=':')
+            
     
-            plt.savefig(fname=avFilename, bbox_inches="tight")
-            plt.close()
+            years = mdates.YearLocator()   # every year
+            months = mdates.MonthLocator()  # every month
+            years_fmt = mdates.DateFormatter('%Y')
+            months_fmt = mdates.DateFormatter('%b')
     
-            avFilesDictionary[f'{channelGroup}'] = avFilename
-    return topStationsDict, splitPlots, avFilesDictionary, services, availabilityType
+            ax.xaxis.set_major_locator(years)
+            ax.xaxis.set_major_formatter(years_fmt)
+            ax.xaxis.set_minor_locator(months)
+            ax.xaxis.set_minor_formatter(months_fmt)
+            ax.tick_params(axis="x", which="both", rotation=45)
+            
+                
+            ax.set_title(f'Availability for {network}, {startDate} to {endDate}')
+        
+        
+        plt.tight_layout()
+        avFilename = f'{imageDir}/{network}_{channelGroup}_availability.png'
+
+        plt.savefig(fname=avFilename, bbox_inches="tight")
+        plt.close()
+
+        avFilesDictionary[f'{channelGroup}'] = avFilename
+
+    return topStationsDict, splitPlots, avFilesDictionary, services_used, availabilityType
 
 
 ## BOXPLOTS
 
 def doBoxPlots(splitPlots, metricList, metricsRequired, network, stations, locations, channels, startDate, endDate, nBoxPlotSta, nTop, nBottom, includeOutliers, imageDir):
     # Retrieve metrics from mustang service
-    print("INFO: Retrieving metrics from the MUSTANG webservices...")
-    metricsWithPlots = []
+    print("INFO: Generating Boxplots")
+    print("    INFO: Retrieving metrics from the MUSTANG webservices...")
+    metricsWithPlots = list()
+    
     
     metricDF = pd.DataFrame()
     for metric in metricList:
@@ -465,25 +488,24 @@ def doBoxPlots(splitPlots, metricList, metricsRequired, network, stations, locat
         metricDF = reportUtils.addMetricToDF(metric, metricDF, network, stations, locations, channels, startDate, endDate)
     
     if metricDF.empty:
-        print(f"WARNING: No metrics retrieved for {network}.{stations}.{locations}.{channels} {startDate}-{endDate}")
+        print(f"**** WARNING: No metrics retrieved for {network}.{stations}.{locations}.{channels} {startDate}-{endDate} - services could be down or metrics may not exist for data yet ****")
         boxPlotDictionary = {}
         actualChannels = list()
-    else:
-#         try:
-#             metricDF = metricDF[metricDF['percent_availability'] !=0]
-#         except:
-#             print("WARNING: Unable to subset based on percent_availabity > 0")
+        scaledDF = pd.DataFrame()
+        splitPlots = False
         
+    else:
         # Create a list of all channels that actually have metrics
         actualChannels = sorted(list(set([x[3] for x in metricDF['target'].str.split('.')])))    
         actualChannelsText = ','.join(actualChannels)
+        print(f"    INFO: Retrieving metadata for {actualChannelsText}")
         metadataDF = reportUtils.getMetadata(network, stations, locations, actualChannelsText, startDate, endDate,'channel')
         
         scaledDF= metricDF.copy()
     
         # scale sample_rms by "scale" from station ws
         if 'sample_rms' in metricList:
-            print("INFO: Applying scale factor to sample_rms")
+            print("    INFO: Applying scale factor to sample_rms")
 
             scaledDF.rename(columns={"sample_rms" : "sample_rms_orig"}, inplace=True)
             for ind, row in metadataDF.iterrows():
@@ -500,13 +522,10 @@ def doBoxPlots(splitPlots, metricList, metricsRequired, network, stations, locat
         
         boxPlotDictionary = {}
         for channelGroup in actualChannels:
-            tmpDF = scaledDF[scaledDF['target'].str.endswith(channelGroup)]
-
+            print(f'    INFO: Generating Boxplots for {channelGroup}')
             
-            print(f'INFO: Generating Boxplots for {channelGroup}')
+            tmpDF = scaledDF[scaledDF['target'].str.endswith(channelGroup)]
             grouped = tmpDF.groupby(['station'])
-
-    #         fig, axes = plt.subplots(1, len(metricList), figsize=(3*len(metricList),  0.2*nBoxPlotSta))
             fig = plt.Figure(figsize=(3,  0.2*nBoxPlotSta))
             
             filenames = list()
@@ -520,11 +539,16 @@ def doBoxPlots(splitPlots, metricList, metricsRequired, network, stations, locat
                     # Sort by the median value
                     df2 = pd.DataFrame({col:vals[metric] for col,vals in grouped})
                     if df2.isnull().values.all():
-                        print(f"WARNING: all stations are null for {channelGroup} {metric}, bypassing")                            
+                        print(f"        WARNING: All stations are null for {channelGroup} {metric}, bypassing")                            
                         continue
                     
 #                     meds = df2.median(skipna=True)
-                    meds = df2.mean(skipna=True)
+                    if metric == "num_gaps" or metric == "ts_num_gaps" or metric == "ts_num_gaps_total":
+                        meds = df2.mean(skipna=True).dropna(how='all')
+                        plotOrder="sorted by mean value"
+                    else:
+                        meds = df2.median(skipna=True).dropna(how='all')
+                        plotOrder="sorted by median value"
                     meds.sort_values(ascending=True, inplace=True)
                     df2 = df2[meds.index]
                     stationList = sorted(list(set(df2.columns)))
@@ -552,10 +576,10 @@ def doBoxPlots(splitPlots, metricList, metricsRequired, network, stations, locat
                                 
                             else:
                                 boxplot = dftmp.boxplot( ax=ax, vert=False, grid=False, showfliers=False, color={'medians': 'black', 'boxes':'black', 'whiskers':'black'})
-                        ax1.set_title(metric)
+                        ax1.set_title(f'{metric}\n{plotOrder}')
                         ax2.set_xlabel(reportUtils.getMetricLabel(metric))
                         
-                        
+
                         try: 
                             valueRatio = max(meds) / min(meds)
                             valueRange = max(meds) - min(meds)
@@ -566,6 +590,9 @@ def doBoxPlots(splitPlots, metricList, metricsRequired, network, stations, locat
                                     ax2.set_xscale("log")
                                 except:
                                     pass
+                            else:
+                                if ax2.get_xlim()[1] > 10000:
+                                    ax2.ticklabel_format(style='sci')
 
                         except Exception as e:
                             print(e)
@@ -579,7 +606,7 @@ def doBoxPlots(splitPlots, metricList, metricsRequired, network, stations, locat
                             boxplot = df2.boxplot(vert=False, grid=False, figsize=(width,height), showfliers=False, color={'medians': 'black', 'boxes':'black', 'whiskers':'black'})
         
                     
-                        boxplot.set_title(metric)
+                        boxplot.set_title(f'{metric}\n{plotOrder}')
                         boxplot.set_xlabel(reportUtils.getMetricLabel(metric))
                         
                         try: 
@@ -588,6 +615,9 @@ def doBoxPlots(splitPlots, metricList, metricsRequired, network, stations, locat
                             
                             if (valueRatio > 50 ) and not (min(df2.min()) <= 0):
                                 boxplot.set_xscale("log")
+                            else:
+                                if boxplot.get_xlim()[1] > 10000:
+                                    boxplot.ticklabel_format(style='sci')
                             
                         except Exception as e:
                             print(e)
@@ -603,7 +633,7 @@ def doBoxPlots(splitPlots, metricList, metricsRequired, network, stations, locat
                     if metric not in metricsWithPlots:
                         metricsWithPlots.append(metric)  
                 except Exception as e:
-                    print(f"    WARNING: could not plot {metric} - {e}")
+                    print(f"        WARNING: Could not plot {metric} - {e}")
                 
                 
             
@@ -625,7 +655,7 @@ def doPDFs(splitPlots, actualChannels, scaledDF, startDate, endDate, tolerance, 
         
         df2 = pd.DataFrame({col:vals['scale_corrected_sample_rms'] for col,vals in grouped})
         if df2.isnull().values.all():
-            print(f"WARNING: all stations are null for {channelGroup} sample_rms, bypassing")                            
+            print(f"WARNING: All stations are null for {channelGroup} sample_rms, bypassing")                            
             continue
         meds = df2.median(skipna=True)
         meds.sort_values(ascending=True, inplace=True)
@@ -634,6 +664,7 @@ def doPDFs(splitPlots, actualChannels, scaledDF, startDate, endDate, tolerance, 
         ## NOTE: use pdf browser's availability endpoint to determine what channels to expect PDFs for
         
         # 1. lowest corrected sample_rms station.
+        print("  INFO: Searching for lowest corrected sample_rms station")
         for ii in range(len(meds.index)):
             # Starting with the lowest value, make sure that it has enough availability. If not, move on to the next. 
             lowestTarget = meds.index[ii]   # This now contains the quality code
@@ -654,7 +685,7 @@ def doPDFs(splitPlots, actualChannels, scaledDF, startDate, endDate, tolerance, 
             thisStart = thisAvail['earliest'].dt.strftime('%Y-%m-%dT%H:%M:%S').min()
             thisEnd = thisAvail['latest'].dt.strftime('%Y-%m-%dT%H:%M:%S').max()
             
-            print(f"    INFO: Checking percent availability for {thisNetwork}.{thisStation}.{thisLocation}.{thisChannel} to see if there is as least 75% availability")
+            print(f"        INFO: Checking percent availability for {thisNetwork}.{thisStation}.{thisLocation}.{thisChannel} to see if there is as least 75% availability")
             # get the ts_percent_availatility_total (or percent_availability if ph5) for the time between the data start and end. 
             thisPctAvail = checkAvailability(thisNetwork, thisStation, thisLocation, thisChannel, thisStart, thisEnd)
 
@@ -669,7 +700,7 @@ def doPDFs(splitPlots, actualChannels, scaledDF, startDate, endDate, tolerance, 
             lowestTarget = meds.index[0]
             lowestNSLC = lowestTarget[:-3] 
          
-        print(f"    --> lowest scaled sample_rms station: {lowestTarget.split('.')[1]}")
+        print(f"        --> lowest scaled sample_rms station: {lowestTarget.split('.')[1]}")
         
         # Get a list of channels that should have noise profiles for this station  
         expectedTargets_lowest = reportUtils.retrieveExpectedPDFs(lowestNSLC, startDate, endDate)
@@ -692,6 +723,7 @@ def doPDFs(splitPlots, actualChannels, scaledDF, startDate, endDate, tolerance, 
         
 
         # 2. largest corrected sample_rms  station
+        print("  INFO: Searching for greatest corrected sample_rms station")
         for ii in reversed(range(len(meds.index))):
             largestTarget = meds.index[ii]
             largestNSL = largestTarget[:-3]
@@ -712,7 +744,7 @@ def doPDFs(splitPlots, actualChannels, scaledDF, startDate, endDate, tolerance, 
             thisStart = thisAvail['earliest'].dt.strftime('%Y-%m-%dT%H:%M:%S').min()
             thisEnd = thisAvail['latest'].dt.strftime('%Y-%m-%dT%H:%M:%S').max()
 
-            print(f"    INFO: Checking percent availability for {thisNetwork}.{thisStation}.{thisLocation}.{thisChannel} to see if there is as least 75% availability")
+            print(f"        INFO: Checking percent availability for {thisNetwork}.{thisStation}.{thisLocation}.{thisChannel} to see if there is as least 75% availability")
             # get the percent availability between the start and end times of the data
             thisPctAvail = checkAvailability(thisNetwork, thisStation, thisLocation, thisChannel, thisStart, thisEnd)
             
@@ -730,7 +762,7 @@ def doPDFs(splitPlots, actualChannels, scaledDF, startDate, endDate, tolerance, 
         # Get a list of channels that should have noise profiles for this station  
         expectedTargets_largest = reportUtils.retrieveExpectedPDFs(largestNSL, startDate, endDate)
         
-        print(f"    --> greatest scaled sample_rms station: {largestTarget.split('.')[1]}")
+        print(f"        --> greatest scaled sample_rms station: {largestTarget.split('.')[1]}")
         pdfFiles = list()
         for target in expectedTargets_largest:
             
@@ -751,10 +783,20 @@ def doPDFs(splitPlots, actualChannels, scaledDF, startDate, endDate, tolerance, 
 
         
         # 3. composite stations - entire network
-        print("    --> composite PDF of all stations")
+        print("  INFO: Retrieving composite PDF of all stations")
+#         print("    --> composite PDF of all stations")
         allTarget = f'{network}.{stations}.{locations}.{channelGroup[0:2]}'
         expectedTargets_all = reportUtils.retrieveExpectedPDFs(allTarget, startDate, endDate)
         expectedChannels = list(set([x.split('.')[3] for x in expectedTargets_all]))
+        # Get power range to display based on channel
+        if not userDefinedPowerRange:
+            try:
+                spectPowerRange = powerRanges[target.split('.')[3][0:2]]
+            except:
+                spectPowerRange = [-175,-20]
+        else:
+            spectPowerRange = userDefinedPowerRange
+
 
         files = list()
         for channel in expectedChannels:
@@ -782,7 +824,7 @@ def doSpectrograms(splitPlots, actualChannels, topStationsDict, scaledDF, startD
         
         df2 = pd.DataFrame({col:vals['scale_corrected_sample_rms'] for col,vals in grouped})
         if df2.isnull().values.all():
-            print(f"WARNING: all stations are null for {channelGroup} scaled sample_rms, bypassing")                            
+            print(f"WARNING: All stations are null for {channelGroup} scaled sample_rms, bypassing")                            
             continue
         
         meds = df2.median(skipna=True)
@@ -792,6 +834,7 @@ def doSpectrograms(splitPlots, actualChannels, topStationsDict, scaledDF, startD
         ## NOTE: use pdf browser's availability endpoint to determine what channels to expect noise plots for
         
         # 1. lowest corrected sample_rms station
+        print("  INFO: Searching for lowest corrected sample_rms station")
         for ii in range(len(meds.index)):
             # Starting with the lowest value, make sure that it has enough availability. If not, move on to the next. 
             lowestTarget = meds.index[ii]   # This now contains the quality code
@@ -812,7 +855,7 @@ def doSpectrograms(splitPlots, actualChannels, topStationsDict, scaledDF, startD
             thisStart = thisAvail['earliest'].dt.strftime('%Y-%m-%dT%H:%M:%S').min()
             thisEnd = thisAvail['latest'].dt.strftime('%Y-%m-%dT%H:%M:%S').max()
             
-            print(f"    INFO: Checking percent availability for {thisNetwork}.{thisStation}.{thisLocation}.{thisChannel} to see if there is as least 75% availability")
+            print(f"        INFO: Checking percent availability for {thisNetwork}.{thisStation}.{thisLocation}.{thisChannel} to see if there is as least 75% availability")
             # Get the percent availability between the start and end for this target
             thisPctAvail = checkAvailability(thisNetwork, thisStation, thisLocation, thisChannel, thisStart, thisEnd)
             
@@ -832,7 +875,7 @@ def doSpectrograms(splitPlots, actualChannels, topStationsDict, scaledDF, startD
         expectedTargets_lowest = reportUtils.retrieveExpectedPDFs(lowestNSLC, startDate, endDate)
         
         
-        print(f"    --> lowest scaled sample_rms station: {lowestTarget.split('.')[1]}")
+        print(f"        --> lowest scaled sample_rms station: {lowestTarget.split('.')[1]}")
         spectFiles = list()
         for target in expectedTargets_lowest:
             
@@ -851,6 +894,7 @@ def doSpectrograms(splitPlots, actualChannels, topStationsDict, scaledDF, startD
         
         
         # 2. largest corrected sample_rms station
+        print("  INFO: Searching for lowest corrected sample_rms station")
         for ii in reversed(range(len(meds.index))):
             largestTarget = meds.index[ii]
             largestNSL = largestTarget[:-3]
@@ -871,7 +915,7 @@ def doSpectrograms(splitPlots, actualChannels, topStationsDict, scaledDF, startD
             thisStart = thisAvail['earliest'].dt.strftime('%Y-%m-%dT%H:%M:%S').min()
             thisEnd = thisAvail['latest'].dt.strftime('%Y-%m-%dT%H:%M:%S').max()
 
-            print(f"    INFO: Checking percent availability for {thisNetwork}.{thisStation}.{thisLocation}.{thisChannel} to see if there is as least 75% availability")
+            print(f"        INFO: Checking percent availability for {thisNetwork}.{thisStation}.{thisLocation}.{thisChannel} to see if there is as least 75% availability")
             # Get the percent availability between the start and end times for this target
             thisPctAvail = checkAvailability(thisNetwork, thisStation, thisLocation, thisChannel, thisStart, thisEnd)
             
@@ -891,7 +935,7 @@ def doSpectrograms(splitPlots, actualChannels, topStationsDict, scaledDF, startD
         expectedTargets_largest = reportUtils.retrieveExpectedPDFs(largestNSL, startDate, endDate)
 
         
-        print(f"    --> greatest scaled sample_rms station: {largestTarget.split('.')[1]}")
+        print(f"        --> greatest scaled sample_rms station: {largestTarget.split('.')[1]}")
         spectFiles = list()
         for target in expectedTargets_largest:
             
@@ -915,6 +959,7 @@ def doMap(network, stations, locations, channels, startDate, endDate, basemap, m
     print("INFO: Generating station map")
     try:
         # Grab the station-level metadata for the network
+        print("    INFO: Retrieving metadata")
         metadataDF = reportUtils.getMetadata(network, stations, locations, channels, startDate, endDate, 'station')
         metadataDF['EndTime'].replace(np.nan, '', regex=True, inplace=True)
         
@@ -928,6 +973,7 @@ def doMap(network, stations, locations, channels, startDate, endDate, basemap, m
         zoom = reportUtils.getBoundsZoomLevel(bounds, mapDim)        
 
         # Create the figure
+        print("    INFO: Plotting")
         fig = px.scatter_mapbox(metadataDF, lat="Latitude", lon="Longitude", hover_name="Station", 
                                 hover_data=["Latitude", "Longitude","StartTime","EndTime"],
                                 color_discrete_sequence=["indigo"], zoom=zoom, height=500)
@@ -965,7 +1011,8 @@ def doReport(splitPlots, services, outfile, channels, network, startDate, endDat
     introText = f'This report is intended as a quick overview of the quality of the data archived for the network ' \
                 f'and time period specified above. Our goal in generating these reports is to give PIs better insight ' \
                 f'into the quality of the data archived at the DMC, as well as a demonstration of the utility provided ' \
-                f'by MUSTANG and the many metrics and products it generates.  For PIs, we hope that these reports will ' \
+                f'by the IRIS DMC quality assurance system <a href=\"http://service.iris.edu/mustang/?\" target=\"_blank\">MUSTANG</a> '\
+                f'and the many metrics and products it generates.  For PIs, we hope that these reports will ' \
                 f'inform which stations are problematic and might be avoided for ongoing data analysis, as well as providing ' \
                 f'lessons on which field practices resulted in improved data quality and vice versa.  Armed with this ' \
                 f'information, we hope that PIs will be better positioned to produce high quality data from future field activities.' \
@@ -973,8 +1020,8 @@ def doReport(splitPlots, services, outfile, channels, network, startDate, endDat
                 f'It is recommended that users may benefit from a more thorough quality assurance inspection of the data, ' \
                 f'especially if anything suspicious arises from this report.' \
                 f'<br/><br/>' \
-                f'Data and metadata are stored at the IRIS DMC and the information here reflects the holdings in their ' \
-                f'archive. This report is generated by utilizing their quality assurance system, MUSTANG.' \
+                f'Data and metadata are stored at the IRIS DMC and the information here reflects the holdings in their archive. ' \
+                f'Quality metrics, Probability Density Functions (PDFs), and PDF-mode spectrograms are generated by MUSTANG.' \
                 f'<br/><br/>' \
                 f'To see the metadata holdings, see here:<br/>' \
                 f'<p><a href=\"http://ds.iris.edu/mda/{network}/?starttime={startDate}T00:00:00&endtime={endDate}T23:59:59\" target=\"_blank\"> ' \
@@ -1000,7 +1047,7 @@ def doReport(splitPlots, services, outfile, channels, network, startDate, endDat
                             f'The metadata extents are retrieved from the IRIS DMC station services ' \
                             f'{stationServiceLink}, ' \
                             f'while the data extents (and gaps) ' \
-                            f'are from the IRIS DMC availability services {availabilityServiceLink}.' \
+                            f'are from the IRIS DMC availability services {availabilityServiceLink}. ' \
                             f'The gap tolerance is an adjustable value and for this report a value of {tolerance} seconds was used.<br/><br/> '\
                             f'In addition, each channel lists the percent of data available, using the '\
                             f'<a href=\"http://service.iris.edu/mustang/metrics/docs/1/desc/{availabilityType}/\" ' \
@@ -1011,18 +1058,18 @@ def doReport(splitPlots, services, outfile, channels, network, startDate, endDat
     
     if availabilityType == 'ts_percent_availability_total':
         availabilityIntroText = f'{availabilityIntroText}' \
-                                f'This means that it will display the percent of time that there is available data over the entire requested period,' \
+                                f'This means that it will display the percent of time that there is available data over the entire requested period, ' \
                                 f'agnostic to the metadata extents for the channel.<br/>'
                                 
     elif availabilityType == 'percent_availability':
         availabilityIntroText = f'{availabilityIntroText}' \
                                 f'The value displayed is the average of the daily percent_availability values. Since percent_availability '\
-                                f'is only calculated for days that have metadata, this value represents the amount of data available' \
+                                f'is only calculated for days that have metadata, this value represents the amount of data available ' \
                                 f'for the time bounded by the metadata extents for each channel.<br/>'
       
     
     if splitPlots == 1:
-        availabilityIntroText = f'{availabilityIntroText} <br/>The {nTop} stations with the greatest availability and {nBottom} stations' \
+        availabilityIntroText = f'{availabilityIntroText} <br/>The {nTop} stations with the greatest availability and {nBottom} stations ' \
                                 f'with the least availability are plotted.<br/>'
          
     else:
@@ -1058,7 +1105,8 @@ def doReport(splitPlots, services, outfile, channels, network, startDate, endDat
       
     boxPlotIntroText = '''
     Metric Boxplots are generated using the Z component for each channel group (for example, BHZ, HHZ, HNZ, etc.) 
-    and for each metric included in the report. Each metric boxplot is sorted by the mean value of the Z component.<br/><br/> 
+    and for each metric included in the report. Metric boxplots are sorted by the median value of the Z component. This is true for all metrics
+    except for num_gaps, ts_num_gaps, and ts_num_gaps_total, which are sorted by mean value.<br/><br/> 
     
     '''
     
@@ -1072,49 +1120,53 @@ def doReport(splitPlots, services, outfile, channels, network, startDate, endDat
                         f'This line is many times not in the center, being skewed left or skewed right within the two quartiles.</li>' \
                         f'<li>Range Whiskers<br/>' \
                         f'Two lines run out from the quartile boxes, extending to the smallest non-outlier value and the largest non-outlier value.  ' \
-                        f'The end points of the whiskers are determined by a range rule, which by default is a value 1.5 times the IQR value from the outer edge' \
+                        f'The end points of the whiskers are determined by a range rule, which by default is a value 1.5 times the IQR value from the outer edge ' \
                         f'of the quartile box.</li>' \
                         f'<li>Outlier Dots (optional)<br/>' \
-                        f'If outliers are selected for the plot, then all other points that do not apply to the established “range” of values are' \
-                        f'displayed as a dot or small circle to the extremes.  These values are atypical representations of the sample population as' \
+                        f'If outliers are selected for the plot, then all other points that do not apply to the established “range” of values are ' \
+                        f'displayed as a dot or small circle to the extremes.  These values are atypical representations of the sample population as ' \
                         f'a whole, but can offer insights into anomalies. </li>' \
                         f'</ul>'
     
     if splitPlots == 1: 
-        boxPlotIntroText3 = f'<br/>Within each boxplot, we display the {nTop} greatest and the {nBottom} smallest mean metric ' \
-                            f'values for stations in the network.  ' \
+        boxPlotIntroText3 = f'<br/>Within each boxplot, we display the {nTop} greatest and the {nBottom} lowest median metric ' \
+                            f'values (mean values for the num_gap metrics) for stations in the network.  ' \
                             f'To help visualize these groups, they are plotted separately with the top plot containing the {nTop} greatest, and the bottom plot ' \
-                            f'the {nBottom} smallest mean metric values.<br/>' \
-                            f'<br/> Detailed information about each metric and how it was generated can be found by visiting the following links:<br/> ' 
+                            f'containing the {nBottom} smallest median metric values.<br/>' \
+                            f'<br/> Detailed information about each metric and how it was generated can be found by visiting the following links:</p> <ul>' 
                             
     else:
         boxPlotIntroText3 = f'<br/>Displaying all stations in the network.<br/>' \
-                            f'<br/> Detailed information about each metric and how it was generated can be found by visiting the following links:<br/>' 
+                            f'<br/> Detailed information about each metric and how it was generated can be found by visiting the following links:</p><ul> '
 
     # Loop over the metrics actually used in the report and append the link to the documentation on that metric
+    
     for metric in metricsWithPlots:
         if metric == "scale_corrected_sample_rms":
             metric = 'sample_rms'
         boxPlotIntroText3 = f'{boxPlotIntroText3}<li><a href=\"http://service.iris.edu/mustang/metrics/docs/1/desc/{metric}\" target=\"_blank\">{metric}</a></li>\n'
 
-
+    boxPlotIntroText3 = f'{boxPlotIntroText3} </ul>'
 
 
     
-    pdfPlotIntroText = f'This section contains probability density function (PDF) plots for the stations with the greatest median scaled RMS, ' \
-                       f'lowest median scaled RMS, and composite of all stations for each channel set.  Station/channels with less than ' \
+    pdfPlotIntroText = f'This section contains probability density function (PDF) plots for the stations with the greatest median RMS (scaled by sensitivity), ' \
+                       f'lowest median RMS (scaled by sensitivity), and composite of all stations for each channel set.  Station-channels with less than ' \
                        f'75% data availability (calculated between the first and last timestamp of the data for that channel) ' \
                        f'are omitted unless none of the stations have at least 75% availability. Detailed information ' \
                        f'about these PDF plots and how MUSTANG generates them ' \
                        f'can be found by visiting this link: <a href=\"http://service.iris.edu/mustang/noise-pdf/docs/1/help/\" target=\"_blank\">' \
                        f'http://service.iris.edu/mustang/noise-pdf/docs/1/help/</a></p>\n' \
-                       f'Please note that you can also click the links below to access the MUSTANG PDF browser, which allows you to view ' \
-                       f'PDF plots by stations and channels on an annual, monthly, or daily basis.' 
+                       f'Please note that you can also click the links below to access the MUSTANG PDF Browser, which allows you to view PDF plots '\
+                       f'for all stations in the network on a total, annual, monthly, daily, or custom time period basis. Within the Browser, you can ' \
+                       f'click on any PDF image to navigate through these time intervals.'
+                       
+                 
 
     
     if splitPlots == 1:
-        spectrgramPlotIntoText = f'This section contains spectrogram plots for the most continuous stations with the greatest median scaled RMS and ' \
-                             f'lowest median scaled RMS for each channel set.  Stations are selected from the list of the {nTop} stations ' \
+        spectrgramPlotIntoText = f'This section contains spectrogram plots of daily PDF-mode values for the most continuous stations with the greatest median RMS (scaled by sensitivity) and ' \
+                             f'lowest median RMS (scaled by sensitivity) for each channel set.  Stations are selected from the list of the {nTop} stations ' \
                              f'with the greatest total availability for that channel group. Stations with less than 75% data availability are omitted '\
                              f'unless none of the top {nTop} stations have at least 75% availability - in which case, the station with the greatest/lowest median '\
                              f'scaled RMS value from the top {nTop} stations is used.<br/><br/> ' \
@@ -1124,8 +1176,8 @@ def doReport(splitPlots, services, outfile, channels, network, startDate, endDat
                              f'Please note that you can also click the links below to access the MUSTANG spectrogram browser for each channel group below, ' \
                              f'which allows you to view spectrogram plots from all the stations in your network.' 
     else:
-        spectrgramPlotIntoText = f'This section contains spectrogram plots for the stations with the greatest median scaled RMS and ' \
-                             f'lowest median scaled RMS for each channel set. Station/channels with less than 75% data availability are omitted ' \
+        spectrgramPlotIntoText = f'This section contains spectrogram plots of daily PDF-mode values for the stations with the greatest median RMS (scaled by sensitivity) and ' \
+                             f'lowest median RMS (scaled by sensitivity) for each channel set. Station-channels with less than 75% data availability are omitted ' \
                              f'unless none of the stations have at least 75% availability - in which case, the station with the greatest/lowest median '\
                              f'scaled RMS value is used.<br/><br/> ' \
                              f'Detailed information about these spectrogram plots and how MUSTANG ' \
@@ -1357,7 +1409,7 @@ def doReport(splitPlots, services, outfile, channels, network, startDate, endDat
         f.write("<p></p>");
         
         for channel in actualChannels:
-            f.write(f"<h3>{channel[0:2]}</h3>")
+            f.write(f"<h3>{channel[0:2]} channels</h3>")
             f.write("<p></p>");
             
             f.write('<div class="row">')
@@ -1399,7 +1451,7 @@ def doReport(splitPlots, services, outfile, channels, network, startDate, endDat
         f.write("<p></p>");
         
         for channel in actualChannels:
-            f.write(f"<h3>{channel[0:2]}</h3>")
+            f.write(f"<h3>{channel[0:2]} channels</h3>")
             f.write("<p></p>");
             
             f.write('<div class="row">')
@@ -1461,7 +1513,7 @@ def doReport(splitPlots, services, outfile, channels, network, startDate, endDat
             pdfLink = f'http://service.iris.edu/mustang/noise-pdf-browser/1/gallery?'\
                        f'network={network}&channel={channel[0:2]}?&interval=all&' \
                        f'starttime={startDate}&endtime={endDate}'
-            f.write(f"<h3>{channel[0:2]} - <a href='{pdfLink}' target='_blank' >PDF Browser</a></h3>")
+            f.write(f"<h3>{channel[0:2]} channels - <a href='{pdfLink}' target='_blank' >PDF Browser</a></h3>")
             f.write('<div class="row">')
             f.write('  <div class="column">')
             f.write('<center>Lowest RMS Station</center><br/>')
@@ -1519,7 +1571,7 @@ def doReport(splitPlots, services, outfile, channels, network, startDate, endDat
             spectLink = f'http://service.iris.edu/mustang/noise-pdf-browser/1/spectrogram?' \
                         f'network={network}&channel={channel[0:2]}?&' \
                         f'starttime={startDate}&endtime={endDate}'
-            f.write(f"<h3>{channel[0:2]} - <a href='{spectLink}' target='_blank' >Spectrogram Browser</a></h3>")
+            f.write(f"<h3>{channel[0:2]} channels - <a href='{spectLink}' target='_blank' >Spectrogram Browser</a></h3>")
             f.write('<div class="row">')
             f.write('  <div class="spectcolumn">')
             f.write('<center>Lowest RMS Station</center><br/>')
@@ -1622,29 +1674,31 @@ def doZip(outdir, outfile):
 
 
 def main():
-    if (len(sys.argv) == 1) or (sys.argv[1] == '--h') or (sys.argv[1] == '-h'):
-        helpText = '''
-        PIQQA USAGE:  python PIQQA.py --network=NET --start=YYYY-mm-dd --end=YYYY-mm-dd 
+    
+    helpText = '''
+    PIQQA USAGE:  python PIQQA.py --network=NET --start=YYYY-mm-dd --end=YYYY-mm-dd 
+    
+    Required Fields:
+        --network=: network code
+        --start=: start date, YYYY-mm-dd
+        --end=: end date, YYYY-mm-dd; time defaults to 00:00:00, so to include all of 2020 the end date would be 2021-01-01
+    Optional Fields
+        --station[s]=: comma-separated list of station codes; defaults to "*"
+        --location[s]=: comma-separated list of location codes; defaults to "*"
+        --channel[s]=: comma-sparated list of channel groups (HH, BH); defaults to "*"
+        --metric[s]=: comma-separated list of metrics to run for the boxplots; defaults: ts_channel_continuity,sample_rms,num_gaps
+        --maxplot=: number of stations to include in the boxplots; defaults to 30
+        --colorpalette=: color palette for spectrograms; defaults to 'RdYlBu'
+            options available at http://service.iris.edu/mustang/noise-spectrogram/1/
+        --includeoutliers=: whether to include outliers in the boxplots, True/False; defaults to False
+        --spectralrange=: power range to use in the PDFs and spectrograms, comma separated values:  min, max; defaults depend on channel type
+        --basemap=: the name of the basemap to be used for the map; defaults to 'open-street-map'
+    If PIQQA is not working as expected, ensure that the conda environment is activated
+    '''
         
-        Required Fields:
-            --network=: network code
-            --start=: start date, YYYY-mm-dd
-            --end=: end date, YYYY-mm-dd; time defaults to 00:00:00, so to include all of 2020 the end date would be 2021-01-01
-        Optional Fields
-            --stations=: comma-separated list of station codes; defaults to "*"
-            --locations=: comma-separated list of location codes; defaults to "*"
-            --channels=: comma-sparated list of channel groups (HH, BH); defaults to "*"
-            --metrics=: comma-separated list of metrics to run for the boxplots; defaults: ts_channel_up_time,sample_rms,num_gaps
-            --maxplot=: number of stations to include in the boxplots; defaults to 30
-            --colorpalette=: color palette for spectrograms; defaults to 'RdYlBu'
-                options available at http://service.iris.edu/mustang/noise-spectrogram/1/
-            --includeoutliers=: whether to include outliers in the boxplots, True/False; defaults to False
-            --spectralrange=: power range to use in the PDFs and spectrograms, comma separated values:  min, max; defaults depend on channel type
-            --basemap=: the name of the basemap to be used for the map; defaults to 'open-street-map'
-        If PIQQA is not working as expected, ensure that the conda environment is activated
-        '''
-        quit(helpText)
 
+    if (len(sys.argv) == 1) or (sys.argv[1] == '--h') or (sys.argv[1] == '-h'):
+        quit(helpText)
     metricList = ['ts_channel_continuity','sample_rms','num_gaps']
     metricsRequired = []    # requiring percent_availability is obsolete, but leaving this as an option in case something changes in teh future. 
     
@@ -1657,7 +1711,7 @@ def main():
     
     spectColorPalette =  'RdYlBu'
     includeOutliers = False
-    basemap = "open-street-map"
+    basemap = "stamen-terrain"
     
     tolerance = 60
     
@@ -1677,33 +1731,44 @@ def main():
     ######
     
     ####### Overwrite defaults with values from the command line
+    unknownArgs = list()
     for arg in sys.argv:
         if arg.lower().startswith('--network='):
             network = arg.split('=')[1]
-        if arg.lower().startswith('--stations='):
+        elif arg.lower().startswith('--stations=') or arg.lower().startswith('--station='):
             stations = arg.split('=')[1]
-        if arg.lower().startswith('--locations='):
+        elif arg.lower().startswith('--locations=') or arg.lower().startswith('--location='):
             locations = arg.split('=')[1]
-        if arg.lower().startswith('--channels='):
+        elif arg.lower().startswith('--channels=') or arg.lower().startswith('--channel='):
             channels = arg.split('=')[1]
-        if arg.lower().startswith('--start='):
+        elif arg.lower().startswith('--start='):
             startDate = arg.split('=')[1]
-        if arg.lower().startswith('--end='):
+        elif arg.lower().startswith('--end='):
             endDate = arg.split('=')[1]
-        if arg.lower().startswith('--maxplot='):
+        elif arg.lower().startswith('--maxplot='):
             nBoxPlotSta = int(arg.split('=')[1])
-        if arg.lower().startswith('--colorpalette='):
+        elif arg.lower().startswith('--colorpalette='):
             spectColorPalette = arg.split('=')[1]
-        if arg.lower().startswith('--includeoutliers='):
+        elif arg.lower().startswith('--includeoutliers='):
             includeOutliers = arg.split('=')[1]
             if includeOutliers.lower() == "true":
                 includeOutliers = True
-        if arg.lower().startswith('--spectralrange='):
+        elif arg.lower().startswith('--spectralrange='):
             userDefinedPowerRange = [x.strip() for x in arg.split('=')[1].split(',')]
-        if arg.lower().startswith('--metrics='):
+        elif arg.lower().startswith('--metrics=') or arg.lower().startswith('--metric='):
             metricList = [x.strip() for x in arg.split('=')[1].split(',')]
-        if arg.lower().startswith('--basemap='):
+        elif arg.lower().startswith('--basemap='):
             basemap = arg.split('=')[1]
+        elif arg.lower() == "piqqa.py":
+            continue
+        else:
+            unknownArgs.append(arg)
+            
+    if len(unknownArgs) > 0:
+        print(f"Unrecognized arguments found: {','.join(unknownArgs)}")
+        print(f'{helpText}')
+        quit("INFO: Exiting PIQQA")       
+    
     #     if arg.lower().startswith('--ph5'):
     #         service = 'ph5ws'
     
@@ -1728,12 +1793,12 @@ def main():
         startYear = datetime.datetime.strptime(startDate, '%Y-%m-%d').strftime('%Y')
     except:
         ireturn = 1
-        print("WARNING: could not parse start date, is it formatted correctly? YYYY-mm-dd")
+        print("WARNING: Could not parse start date, is it formatted correctly? YYYY-mm-dd")
     try:    
         endYear = (datetime.datetime.strptime(endDate, '%Y-%m-%d') - datetime.timedelta(days=1)).strftime('%Y') 
     except:
         ireturn = 1
-        print("WARNING: could not parse end date, is it formatted correctly? YYYY-mm-dd")
+        print("WARNING: Could not parse end date, is it formatted correctly? YYYY-mm-dd")
     if ireturn == 1:
         quit("INFO: Exiting PIQQA")
      
@@ -1744,7 +1809,7 @@ def main():
     # sample_rms is required in order to be able to find the least/greatest rms stations, so if it is
     # not already in the metric list then it must be added.    
     if 'sample_rms' not in metricList:
-        print("INFO: adding sample_rms to the metric list")
+        print("INFO: Adding sample_rms to the metric list")
         metricList.append('sample_rms')
     
     # If any metrics from metricsRequired (used to be percent_availability, now empty but leaving in place in case 
@@ -1772,7 +1837,7 @@ def main():
     try:
         shutil.copyfile(boxplotExampleImage, boxPlotExampleImage_moved)
     except:
-        print(f"WARNING: could not find boxplot example image - {boxplotExampleImage}")
+        print(f"WARNING: Could not find boxplot example image - {boxplotExampleImage}")
     os.chdir(outdir)    
     
     # Put the figures all together in a subdirectory
@@ -1785,7 +1850,7 @@ def main():
     try:
         shutil.move(boxplotExampleImage, boxPlotExampleImage_moved)
     except:
-        print(f"WARNING: could not find boxplot example image - {boxplotExampleImage}")
+        print(f"WARNING: Could not find boxplot example image - {boxplotExampleImage}")
     
     mapFilename = f'{imageDir}/{network}_stationMap.html'
     
