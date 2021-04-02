@@ -1123,7 +1123,7 @@ def doReport(splitPlots, services, outfile, channels, network, startDate, endDat
                         f'The end points of the whiskers are determined by a range rule, which by default is a value 1.5 times the IQR value from the outer edge ' \
                         f'of the quartile box.</li>' \
                         f'<li>Outlier Dots (optional)<br/>' \
-                        f'If outliers are selected for the plot, then all other points that do not apply to the established “range” of values are ' \
+                        f'If outliers are selected for the plot, then all other points that do not apply to the established "range" of values are ' \
                         f'displayed as a dot or small circle to the extremes.  These values are atypical representations of the sample population as ' \
                         f'a whole, but can offer insights into anomalies. </li>' \
                         f'</ul>'
@@ -1196,7 +1196,7 @@ def doReport(splitPlots, services, outfile, channels, network, startDate, endDat
     stationIntroText = f'Below is a list of stations, their locations, and start and end dates.  ' \
                        f'Clicking on any text from a station row will take you to the IRIS metadata aggregator ' \
                        f'page for that station where you can view more detailed information about data epochs, ' \
-                       f'instrumentation, metadata changes, and virtual network affiliations.'
+                       f'instrumentation, metadata changes, and virtual network affiliations.\n'
     
     
 
@@ -1692,7 +1692,7 @@ def main():
             options available at http://service.iris.edu/mustang/noise-spectrogram/1/
         --includeoutliers=: whether to include outliers in the boxplots, True/False; defaults to False
         --spectralrange=: power range to use in the PDFs and spectrograms, comma separated values:  min, max; defaults depend on channel type
-        --basemap=: the name of the basemap to be used for the map; defaults to 'open-street-map'
+        --basemap=: the name of the basemap to be used for the map; defaults to 'stamen-terrain'
     If PIQQA is not working as expected, ensure that the conda environment is activated
     '''
         

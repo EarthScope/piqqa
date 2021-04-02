@@ -118,13 +118,13 @@ Running PIQQA.py without any arguments, or with the -h/--h flags, will produce s
         --stations=: comma-separated list of station codes; defaults to "*"
         --locations=: comma-separated list of location codes; defaults to "*"
         --channels=: comma-sparated list of channel groups (HH, BH); defaults to "*"
-        --metrics=: comma-separated list of metrics to run for the boxplots; defaults: ts_channel_up_time,sample_rms,num_gaps
+        --metrics=: comma-separated list of metrics to run for the boxplots; defaults: ts_channel_continuity,sample_rms,num_gaps
         --maxplot=: number of stations to include in the boxplots; defaults to 30
         --colorpalette=: color palette for spectrograms; defaults to 'RdYlBu'
             options available at http://service.iris.edu/mustang/noise-spectrogram/1/
         --includeoutliers=: whether to include outliers in the boxplots, True/False; defaults to False
         --spectralrange=: power range to use in the PDFs and spectrograms, comma separated values:  min, max; defaults depend on channel type
-        --basemap=: the name of the basemap to be used for the map; defaults to 'open-street-map'
+        --basemap=: the name of the basemap to be used for the map; defaults to 'stamen-terrain'
 
     If PIQQA is not working as expected, ensure that the conda environment is activated
 ```

@@ -297,17 +297,17 @@ def getMetricLabel(metric):
     metricLabels = {'amplifier_saturation':'daily flag count \n(number of occurrences)',
                      'calibration_signal':'daily flag count \n(number of occurrences)',
                      'clock_locked':'daily flag count \n(number of occurrences)',
-                     'cross_talk':'correlation coefficient', # no units
-                     'data_latency':'latency (seconds)',
+                     'cross_talk':'correlation coefficient \n', # no units
+                     'data_latency':'latency (seconds) \n',
                      'dc_offset':'daily indicator of likelihood of \nDC offset shift', # no units
-                     'dead_channel_gsn':'indicator',
-                     'dead_channel_lin':'standard deviation of residuals (dB)',
+                     'dead_channel_gsn':'indicator \n',
+                     'dead_channel_lin':'standard deviation of residuals (dB) \n',
                      'digital_filter_charging':'daily flag count \n(number of occurrences)',
                      'digitizer_clipping':'daily flag count \n(number of occurrences)',
                      'event_begin':'daily flag count \n(number of occurrences)',
                      'event_end':'daily flag count \n(number of occurrences)',
                      'event_in_progress':'daily flag count \n(number of occurrences)',
-                     'feed_latency':'latency (seconds)',
+                     'feed_latency':'latency (seconds) \n',
                      'gap_list':'daily gap length \n(seconds)',
                      'glitches':'daily flag count \n(number of occurrences)',
                      'max_gap':'daily maximum gap length \n(seconds)',
@@ -320,38 +320,38 @@ def getMetricLabel(metric):
                      'num_spikes':'daily outlier count \n(number of occurrences)',
                      'pct_above_nhnm':'daily PDF matrix above \nNew High Noise Model (%)',
                      'pct_below_nlnm':'daily PDF matrix below \nNew Low Noise Model (%)',
-                     'percent_availability':'daily availability (%)',
+                     'percent_availability':'daily availability (%) \n',
                      'polarity_check':'maximum cross-correlation \nfunction', # no units
                      'pressure_effects':'daily zero-lag \ncross-correlation function', # no units
                      'sample_max':'daily maximum amplitude \n(counts)',
                      'sample_mean':'daily mean amplitude \n(counts)',
                      'sample_median':'daily median amplitude \n(counts)',
                      'sample_min':'daily minimum amplitude \n(counts)',
-                     'sample_rate_channel':'daily indicator',
-                     'sample_rate_resp':'daily indicator',
-                     'sample_rms':'daily root-mean-square variance (counts)',
+                     'sample_rate_channel':'daily indicator \n',
+                     'sample_rate_resp':'daily indicator \n',
+                     'sample_rms':'daily root-mean-square variance (counts) \n',
                      'scale_corrected_sample_rms':'daily root-mean-squared variance,\nscaled by sensitivity',
-                     'sample_snr':'signal-to-noise ratio', # no units
+                     'sample_snr':'signal-to-noise ratio \n', # no units
                      'sample_unique':'daily unique sample values \n(number of occurrences)',
                      'spikes':'daily flag count \n(number of occurrences)',
                      'suspect_time_tag':'daily flag count \n(number of occurrences)',
                      'telemetry_sync_error':'daily flag count \n(number of occurrences)',
                      'timing_correction':'daily flag count \n(number of occurrences)',
-                     'timing_quality':'daily average timing quality (%)',
-                     'total_latency':'latency (seconds)',
+                     'timing_quality':'daily average timing quality (%) \n',
+                     'total_latency':'latency (seconds) \n',
                      'ts_num_gaps':'daily gap count \n(number of occurrences)',
                      'ts_num_gaps_total':'gap count \n(number of occurrences)',
                      'ts_max_gap':'daily maximum gap length \n(seconds)',
                      'ts_max_gap_total':'maximum gap length \n(seconds)',
                      'ts_gap_length':'daily total gap length \n(seconds)',
-                     'ts_gap_length_total':'total gap length (seconds)',
-                     'ts_percent_availability':'daily availability (%)',
-                     'ts_percent_availability_total':'availability (%)',
+                     'ts_gap_length_total':'total gap length (seconds) \n',
+                     'ts_percent_availability':'daily availability (%) \n',
+                     'ts_percent_availability_total':'availability (%) \n',
                      'ts_channel_up_time':'daily trace segment length \n(seconds)',
-                     'ts_channel_continuity':'trace segment length (seconds)',
+                     'ts_channel_continuity':'trace segment length (seconds) \n',
                      'gain_ratio':'data/metadata gain ratio', # no units
                      'phase_diff':'data-metadata phase difference \n(degrees)',
-                     'ms_coherence':'coherence function', # no units
+                     'ms_coherence':'coherence function \n', # no units
                      }
     
     labelText = metricLabels[metric]
