@@ -1196,7 +1196,7 @@ def doReport(splitPlots, services, outfile, channels, network, startDate, endDat
     stationIntroText = f'Below is a list of stations, their locations, and start and end dates.  ' \
                        f'Clicking on any text from a station row will take you to the IRIS metadata aggregator ' \
                        f'page for that station where you can view more detailed information about data epochs, ' \
-                       f'instrumentation, metadata changes, and virtual network affiliations.\n'
+                       f'instrumentation, metadata changes, and virtual network affiliations.</p>\n'
     
     
 
