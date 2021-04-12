@@ -7,7 +7,7 @@ Created on Aug 18, 2020
 '''
 
 # version = 'v1.0'
-version = 'v. 0.5'
+version = 'v. 0.6'
 
 import reportUtils
 
@@ -151,7 +151,6 @@ def doAvailability(splitPlots, startDate, endDate, network, stations, locations,
        
             topStations = pctAvDF.iloc[:nTop,:]
             bottomStations = pctAvDF.iloc[-nBottom:,:]
-            print("TEMP: bottomStations %s" % bottomStations)
             
             height = max(min(0.3*nsta, 0.3*nBoxPlotSta), 2)
             width = 15
@@ -251,7 +250,6 @@ def doAvailability(splitPlots, startDate, endDate, network, stations, locations,
                 
             ## And again, for the bottom stations
             bottomStationsAvDF, services = reportUtils.getAvailability(bottomStations['snclq'], startDate, endDate, tolerance)
-            print("TEMP: bottomStationsAvDF %s  " % bottomStationsAvDF)
             for service in services:
                 if service not in services_used:
                     services_used.append(service)
@@ -266,12 +264,7 @@ def doAvailability(splitPlots, startDate, endDate, network, stations, locations,
             for station in bottomStationList:
 
                 # data extents and gaps extents
-                print("TEMP: station %s " % station)
-                print("TEMP: bottomStations[bottomStations['station'] == station].availability.values %s" % bottomStations[bottomStations['station'] == station].availability.values)
-                if bottomStations[bottomStations['station'] == station].availability.values == 0:
-                    print("TEMP: No Data for this station, so filling in with blanks")
-                    
-                else:
+                if not bottomStations[bottomStations['station'] == station].availability.values == 0:
                     thisData = bottomStationsAvDF[bottomStationsAvDF['staloc'] == str(station)]
                     if len(thisData.index) > 1:
                         # then there are gaps
@@ -363,7 +356,6 @@ def doAvailability(splitPlots, startDate, endDate, network, stations, locations,
             f, ax = plt.subplots(figsize=(width, height))
     
             allStationsAvDF, services = reportUtils.getAvailability(pctAvDF['snclq'], startDate, endDate, tolerance)
-            print("TEMP: allStationsAvDF %s " % allStationsAvDF)
             for service in services:
                 if service not in services_used:
                     services_used.append(service)
@@ -379,10 +371,8 @@ def doAvailability(splitPlots, startDate, endDate, network, stations, locations,
             stn = 0
             for station in allStationList:
                 # data extents and gaps extents
-                if pctAvDF[pctAvDF['station'] == station].availability.values == 0:
-                    print("TEMP: No Data for this station, so filling in with blanks")
+                if not pctAvDF[pctAvDF['station'] == station].availability.values == 0:
                     
-                else:
                     thisData = allStationsAvDF[allStationsAvDF['staloc'] == str(station)]
                     if len(thisData.index) > 1:
                         # then there are gaps
@@ -713,7 +703,7 @@ def doPDFs(splitPlots, actualChannels, scaledDF, startDate, endDate, tolerance, 
                 try:
                     spectPowerRange = powerRanges[target.split('.')[3][0:2]]
                 except:
-                    spectPowerRange = [-175,-20]
+                    spectPowerRange = [-200,-20]
             else:
                 spectPowerRange = userDefinedPowerRange
             pdfFile = reportUtils.getPDF(target, startDate, endDate, spectPowerRange, imageDir)            
@@ -723,7 +713,7 @@ def doPDFs(splitPlots, actualChannels, scaledDF, startDate, endDate, tolerance, 
         
 
         # 2. largest corrected sample_rms  station
-        print("  INFO: Searching for greatest corrected sample_rms station")
+        print("  INFO: Searching for highest corrected sample_rms station")
         for ii in reversed(range(len(meds.index))):
             largestTarget = meds.index[ii]
             largestNSL = largestTarget[:-3]
@@ -762,7 +752,7 @@ def doPDFs(splitPlots, actualChannels, scaledDF, startDate, endDate, tolerance, 
         # Get a list of channels that should have noise profiles for this station  
         expectedTargets_largest = reportUtils.retrieveExpectedPDFs(largestNSL, startDate, endDate)
         
-        print(f"        --> greatest scaled sample_rms station: {largestTarget.split('.')[1]}")
+        print(f"        --> highest scaled sample_rms station: {largestTarget.split('.')[1]}")
         pdfFiles = list()
         for target in expectedTargets_largest:
             
@@ -771,7 +761,7 @@ def doPDFs(splitPlots, actualChannels, scaledDF, startDate, endDate, tolerance, 
                 try:
                     spectPowerRange = powerRanges[target.split('.')[3][0:2]]
                 except:
-                    spectPowerRange = [-175,-20]
+                    spectPowerRange = [-200,-20]
             else:
                 spectPowerRange = userDefinedPowerRange
             
@@ -793,7 +783,7 @@ def doPDFs(splitPlots, actualChannels, scaledDF, startDate, endDate, tolerance, 
             try:
                 spectPowerRange = powerRanges[target.split('.')[3][0:2]]
             except:
-                spectPowerRange = [-175,-20]
+                spectPowerRange = [-200,-20]
         else:
             spectPowerRange = userDefinedPowerRange
 
@@ -884,7 +874,7 @@ def doSpectrograms(splitPlots, actualChannels, topStationsDict, scaledDF, startD
                 try:
                     spectPowerRange = powerRanges[target.split('.')[3][0:2]]
                 except:
-                    spectPowerRange = [-175,-20]
+                    spectPowerRange = [-200,-20]
             else:
                 spectPowerRange = userDefinedPowerRange
             spectFile = reportUtils.getSpectrogram(target, startDate, endDate, spectPowerRange, spectColorPalette, imageDir)
@@ -935,7 +925,7 @@ def doSpectrograms(splitPlots, actualChannels, topStationsDict, scaledDF, startD
         expectedTargets_largest = reportUtils.retrieveExpectedPDFs(largestNSL, startDate, endDate)
 
         
-        print(f"        --> greatest scaled sample_rms station: {largestTarget.split('.')[1]}")
+        print(f"        --> highest scaled sample_rms station: {largestTarget.split('.')[1]}")
         spectFiles = list()
         for target in expectedTargets_largest:
             
@@ -944,7 +934,7 @@ def doSpectrograms(splitPlots, actualChannels, topStationsDict, scaledDF, startD
                 try:
                     spectPowerRange = powerRanges[target.split('.')[3][0:2]]
                 except:
-                    spectPowerRange = [-175,-20]
+                    spectPowerRange = [-200,-20]
             else:
                 spectPowerRange = userDefinedPowerRange
             spectFile = reportUtils.getSpectrogram(target, startDate, endDate, spectPowerRange, spectColorPalette, imageDir)
@@ -1069,8 +1059,8 @@ def doReport(splitPlots, services, outfile, channels, network, startDate, endDat
       
     
     if splitPlots == 1:
-        availabilityIntroText = f'{availabilityIntroText} <br/>The {nTop} stations with the greatest availability and {nBottom} stations ' \
-                                f'with the least availability are plotted.<br/>'
+        availabilityIntroText = f'{availabilityIntroText} <br/>The {nTop} stations with the highest availability and {nBottom} stations ' \
+                                f'with the lowest availability are plotted.<br/>'
          
     else:
         availabilityIntroText = f'{availabilityIntroText} <br/>Displaying all stations in the network.<br/>'
@@ -1129,10 +1119,10 @@ def doReport(splitPlots, services, outfile, channels, network, startDate, endDat
                         f'</ul>'
     
     if splitPlots == 1: 
-        boxPlotIntroText3 = f'<br/>Within each boxplot, we display the {nTop} greatest and the {nBottom} lowest median metric ' \
+        boxPlotIntroText3 = f'<br/>Within each boxplot, we display the {nTop} highest and the {nBottom} lowest median metric ' \
                             f'values (mean values for the num_gap metrics) for stations in the network.  ' \
-                            f'To help visualize these groups, they are plotted separately with the top plot containing the {nTop} greatest, and the bottom plot ' \
-                            f'containing the {nBottom} smallest median metric values.<br/>' \
+                            f'To help visualize these groups, they are plotted separately with the top plot containing the {nTop} highest, and the bottom plot ' \
+                            f'containing the {nBottom} lowest median metric values.<br/>' \
                             f'<br/> Detailed information about each metric and how it was generated can be found by visiting the following links:</p> <ul>' 
                             
     else:
@@ -1150,7 +1140,7 @@ def doReport(splitPlots, services, outfile, channels, network, startDate, endDat
 
 
     
-    pdfPlotIntroText = f'This section contains probability density function (PDF) plots for the stations with the greatest median RMS (scaled by sensitivity), ' \
+    pdfPlotIntroText = f'This section contains probability density function (PDF) plots for the stations with the highest median RMS (scaled by sensitivity), ' \
                        f'lowest median RMS (scaled by sensitivity), and composite of all stations for each channel set.  Station-channels with less than ' \
                        f'75% data availability (calculated between the first and last timestamp of the data for that channel) ' \
                        f'are omitted unless none of the stations have at least 75% availability. Detailed information ' \
@@ -1165,10 +1155,10 @@ def doReport(splitPlots, services, outfile, channels, network, startDate, endDat
 
     
     if splitPlots == 1:
-        spectrgramPlotIntoText = f'This section contains spectrogram plots of daily PDF-mode values for the most continuous stations with the greatest median RMS (scaled by sensitivity) and ' \
+        spectrgramPlotIntoText = f'This section contains spectrogram plots of daily PDF-mode values for the most continuous stations with the highest median RMS (scaled by sensitivity) and ' \
                              f'lowest median RMS (scaled by sensitivity) for each channel set.  Stations are selected from the list of the {nTop} stations ' \
-                             f'with the greatest total availability for that channel group. Stations with less than 75% data availability are omitted '\
-                             f'unless none of the top {nTop} stations have at least 75% availability - in which case, the station with the greatest/lowest median '\
+                             f'with the highest total availability for that channel group. Stations with less than 75% data availability are omitted '\
+                             f'unless none of the top {nTop} stations have at least 75% availability - in which case, the station with the highest/lowest median '\
                              f'scaled RMS value from the top {nTop} stations is used.<br/><br/> ' \
                              f'Detailed information about these spectrogram plots and how MUSTANG ' \
                              f'generates them can be found by visiting this link: <a href=\"http://service.iris.edu/mustang/noise-spectrogram/' \
@@ -1176,9 +1166,9 @@ def doReport(splitPlots, services, outfile, channels, network, startDate, endDat
                              f'Please note that you can also click the links below to access the MUSTANG spectrogram browser for each channel group below, ' \
                              f'which allows you to view spectrogram plots from all the stations in your network.' 
     else:
-        spectrgramPlotIntoText = f'This section contains spectrogram plots of daily PDF-mode values for the stations with the greatest median RMS (scaled by sensitivity) and ' \
+        spectrgramPlotIntoText = f'This section contains spectrogram plots of daily PDF-mode values for the stations with the highest median RMS (scaled by sensitivity) and ' \
                              f'lowest median RMS (scaled by sensitivity) for each channel set. Station-channels with less than 75% data availability are omitted ' \
-                             f'unless none of the stations have at least 75% availability - in which case, the station with the greatest/lowest median '\
+                             f'unless none of the stations have at least 75% availability - in which case, the station with the highest/lowest median '\
                              f'scaled RMS value is used.<br/><br/> ' \
                              f'Detailed information about these spectrogram plots and how MUSTANG ' \
                              f'generates them can be found by visiting this link: <a href=\"http://service.iris.edu/mustang/noise-spectrogram/' \
@@ -1510,13 +1500,20 @@ def doReport(splitPlots, services, outfile, channels, network, startDate, endDat
         
         # Loop over each channel group, create a 3x3 (if 3 component) grid for each channel group
         for channel in actualChannels: 
+            
+            # Some channels, such as VM, do not have noise profiles calculated in MUSTANG, and can be bypassed in this section
+            allFiles = pdfDictionary[f'{channel}_smallest'] + pdfDictionary[f'{channel}_greatest'] + pdfDictionary[f'{channel}_all']
+            if allFiles == []:
+                print(f"  WARNING: No PDF plots available for {channel[0:2]}, omitting it from the report")
+                continue
+            
             pdfLink = f'http://service.iris.edu/mustang/noise-pdf-browser/1/gallery?'\
                        f'network={network}&channel={channel[0:2]}?&interval=all&' \
                        f'starttime={startDate}&endtime={endDate}'
             f.write(f"<h3>{channel[0:2]} channels - <a href='{pdfLink}' target='_blank' >PDF Browser</a></h3>")
             f.write('<div class="row">')
             f.write('  <div class="column">')
-            f.write('<center>Lowest RMS Station</center><br/>')
+            f.write('<center>Lower RMS Station</center><br/>')
             
             try:
                 files = pdfDictionary[f'{channel}_smallest']
@@ -1528,7 +1525,7 @@ def doReport(splitPlots, services, outfile, channels, network, startDate, endDat
             
             f.write('  </div>')   
             f.write('  <div class="column">')
-            f.write('<center>Greatest RMS Station</center><br/>')
+            f.write('<center>Higher RMS Station</center><br/>')
             
             try:
                 files = pdfDictionary[f'{channel}_greatest']
@@ -1568,13 +1565,22 @@ def doReport(splitPlots, services, outfile, channels, network, startDate, endDat
     
         # Loop over each channel group, create a 3x2 (if 3 component) grid for each channel group
         for channel in actualChannels: 
+            
+            # Some channels, such as VM, do not have noise profiles calculated in MUSTANG, and can be bypassed in this section
+            allFiles = spectDictionary[f'{channel}_smallest'] + spectDictionary[f'{channel}_greatest']
+            if allFiles == []:
+                print(f"  WARNING: No spectrogram plots available for {channel[0:2]}, omitting it from the report")
+                continue
+            
             spectLink = f'http://service.iris.edu/mustang/noise-pdf-browser/1/spectrogram?' \
                         f'network={network}&channel={channel[0:2]}?&' \
                         f'starttime={startDate}&endtime={endDate}'
             f.write(f"<h3>{channel[0:2]} channels - <a href='{spectLink}' target='_blank' >Spectrogram Browser</a></h3>")
+            if splitPlots == 1: 
+                f.write(f"<b><center>Selected from the {nTop} stations with the highest availability</center></b><br/>")
             f.write('<div class="row">')
             f.write('  <div class="spectcolumn">')
-            f.write('<center>Lowest RMS Station</center><br/>')
+            f.write('<center>Lower RMS Station</center><br/>')
             
             try:
                 files = spectDictionary[f'{channel}_smallest']
@@ -1585,7 +1591,7 @@ def doReport(splitPlots, services, outfile, channels, network, startDate, endDat
             f.write('  </div>')
             
             f.write('  <div class="spectcolumn">')
-            f.write('<center>Greatest RMS Station</center><br/>')
+            f.write('<center>Higher RMS Station</center><br/>')
             
             try:
                 files = spectDictionary[f'{channel}_greatest']
@@ -1716,16 +1722,17 @@ def main():
     tolerance = 60
     
     userDefinedPowerRange = list()
-    powerRanges = {'BH': [-175,-75],
-                   'EH' : [-175,-75],
-                   'HH' : [-175,-75],
-                   'MH' : [-175,-75],
-                   'SH' : [-175,-75],
-                   'EN' : [-175,-20],
-                   'BN' : [-175,-20],
-                   'EP' : [-175,-60],
-                   'DP' : [-175,-60],
-                   'GP' : [-175,-60]}
+    powerRanges = {'BH': [-200,-75],
+                   'EH' : [-200,-75],
+                   'HH' : [-200,-75],
+                   'LH' :  [-200,-25],
+                   'MH' : [-200,-75],
+                   'SH' : [-200,-75],
+                   'EN' : [-200,-20],
+                   'BN' : [-200,-20],
+                   'EP' : [-200,-60],
+                   'DP' : [-200,-60],
+                   'GP' : [-200,-60]}
     
     boxplotExampleImage = './boxplot_example.png'
     ######
