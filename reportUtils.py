@@ -9,7 +9,7 @@ from io import StringIO
 import pandas as pd
 import numpy as np
 import time
-from matplotlib.contour import ClabelText
+# from matplotlib.contour import ClabelText
 import urllib
 import re
 
@@ -102,6 +102,7 @@ def addMetricToDF(metric, DF, network, stations, locations, channels, startDate,
     except Exception as e:
         if not metric== 'ts_percent_availability_total':
             print(f"         --> Unable to get measurements for {metric}, waiting 5 seconds and trying again")
+            print(f"             {URL}")
 #             print(f"     {e}")
         time.sleep(5)
         try:
@@ -161,7 +162,7 @@ def getMetadata(network, stations, locations, channels, startDate, endDate, leve
                         services.append(serviceURL)
             
         except Exception as e:
-            print("    ERROR: unable to retrieve fed catalog information about where the data lives - %s " % e)
+            print("        ERROR: unable to retrieve fed catalog information about where the data lives - %s\n%s " % (fedURL, e))
             services = ['http://service.iris.edu/fdsnws/station/1/', 'http://service.iris.edu/ph5ws/station/1/']
         
         for service in services:
@@ -194,7 +195,7 @@ def getMetadata(network, stations, locations, channels, startDate, endDate, leve
                         tmpDF = pd.read_csv(stationURL, sep='|')
                         tmpDF.rename(columns=lambda x: x.strip(), inplace=True)
                     except:
-                        print(f"    ERROR: Unable to retrieve channel information from {stationURL}")
+                        print(f"        ERROR: Unable to retrieve channel information from {stationURL}")
 
             except:
                 tmpDF = pd.DataFrame()
@@ -272,7 +273,7 @@ def getBoundsZoomLevel(bounds, mapDim):
     
         scale = 2 # adjustment to reflect MapBox base tiles are 512x512 vs. Google's 256x256
         WORLD_DIM = {'height': 256 * scale, 'width': 256 * scale}
-        ZOOM_MAX = 20
+        ZOOM_MAX = 16
         ZOOM_MIN = 0.5
     
         def latRad(lat):

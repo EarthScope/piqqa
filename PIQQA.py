@@ -7,7 +7,7 @@ Created on Aug 18, 2020
 '''
 
 # version = 'v1.0'
-version = 'v. 0.6'
+version = 'v. 0.7'
 
 import reportUtils
 
@@ -77,7 +77,10 @@ def doAvailability(splitPlots, startDate, endDate, network, stations, locations,
     print("    INFO: Retrieving Metadata")
     allMetadataDF = reportUtils.getMetadata(network, stations, locations, channels, startDate, endDate, "channel")
 
-    actualChannels = sorted(list(set(allMetadataDF['channel'])))
+    try:
+        actualChannels = sorted(list(set(allMetadataDF['channel'])))
+    except:
+        quit("\nQUITTING: No information found for network and times, is something wrong? Is there data at IRIS for this network? Does this network have channels with the Z/3 component?")
 
     ## Loop over the channel groups
     for channelGroup in actualChannels:
@@ -331,9 +334,14 @@ def doAvailability(splitPlots, startDate, endDate, network, stations, locations,
                     minor = mdates.WeekdayLocator()  # every month
                     major_fmt = mdates.DateFormatter('%b')
                     minor_fmt = mdates.DateFormatter('%d')
-                else:
+                elif totalElapsedTime >= 91 and totalElapsedTime < 1460:
                     major = mdates.YearLocator()   # every year
                     minor = mdates.MonthLocator()  # every month
+                    major_fmt = mdates.DateFormatter('%Y')
+                    minor_fmt = mdates.DateFormatter('%b')
+                else:
+                    major = mdates.YearLocator()   # every year
+                    minor = mdates.MonthLocator((5,9))  # every month
                     major_fmt = mdates.DateFormatter('%Y')
                     minor_fmt = mdates.DateFormatter('%b')
     
@@ -435,17 +443,39 @@ def doAvailability(splitPlots, startDate, endDate, network, stations, locations,
             ax.xaxis.grid(True, which='both', color='k', linestyle=':')
             
     
-            years = mdates.YearLocator()   # every year
-            months = mdates.MonthLocator()  # every month
-            years_fmt = mdates.DateFormatter('%Y')
-            months_fmt = mdates.DateFormatter('%b')
-    
-            ax.xaxis.set_major_locator(years)
-            ax.xaxis.set_major_formatter(years_fmt)
-            ax.xaxis.set_minor_locator(months)
-            ax.xaxis.set_minor_formatter(months_fmt)
+            if totalElapsedTime < 91:
+                major = mdates.MonthLocator()   # every year
+                minor = mdates.WeekdayLocator()  # every month
+                major_fmt = mdates.DateFormatter('%b')
+                minor_fmt = mdates.DateFormatter('%d')
+            elif totalElapsedTime >= 91 and totalElapsedTime < 1460:
+                major = mdates.YearLocator()   # every year
+                minor = mdates.MonthLocator()  # every month
+                major_fmt = mdates.DateFormatter('%Y')
+                minor_fmt = mdates.DateFormatter('%b')
+            else:
+                major = mdates.YearLocator()   # every year
+                minor = mdates.MonthLocator((5,9))  # every month
+                major_fmt = mdates.DateFormatter('%Y')
+                minor_fmt = mdates.DateFormatter('%b')
+             
+            ax.xaxis.set_major_locator(major)
+            ax.xaxis.set_major_formatter(major_fmt)
+            ax.xaxis.set_minor_locator(minor)
+            ax.xaxis.set_minor_formatter(minor_fmt)
             ax.tick_params(axis="x", which="both", rotation=45)
-            
+                   
+#             years = mdates.YearLocator()   # every year
+#             months = mdates.MonthLocator()  # every month
+#             years_fmt = mdates.DateFormatter('%Y')
+#             months_fmt = mdates.DateFormatter('%b')
+#     
+#             ax.xaxis.set_major_locator(years)
+#             ax.xaxis.set_major_formatter(years_fmt)
+#             ax.xaxis.set_minor_locator(months)
+#             ax.xaxis.set_minor_formatter(months_fmt)
+#             ax.tick_params(axis="x", which="both", rotation=45)
+#             
                 
             ax.set_title(f'Availability for {network}, {startDate} to {endDate}')
         
@@ -497,18 +527,20 @@ def doBoxPlots(splitPlots, metricList, metricsRequired, network, stations, locat
         if 'sample_rms' in metricList:
             print("    INFO: Applying scale factor to sample_rms")
 
-            scaledDF.rename(columns={"sample_rms" : "sample_rms_orig"}, inplace=True)
-            for ind, row in metadataDF.iterrows():
-                thisTarget = row['target']
-                thisStart = row['starttime']
-                thisEnd = row['endtime']
-                if pd.isnull(thisEnd):
-                    thisEnd = datetime.datetime.now()
-                thisScale = row['scale']
-                
-                affectedRows = scaledDF.index[((scaledDF['target']==thisTarget) & (scaledDF['start'] < thisEnd) & (scaledDF['end'] > thisStart))].tolist()
-                scaledDF.loc[affectedRows, 'scale_corrected_sample_rms'] = scaledDF['sample_rms_orig'][affectedRows] / thisScale
-            
+            try:
+                scaledDF.rename(columns={"sample_rms" : "sample_rms_orig"}, inplace=True)
+                for ind, row in metadataDF.iterrows():
+                    thisTarget = row['target']
+                    thisStart = row['starttime']
+                    thisEnd = row['endtime']
+                    if pd.isnull(thisEnd):
+                        thisEnd = datetime.datetime.now()
+                    thisScale = row['scale']
+                    
+                    affectedRows = scaledDF.index[((scaledDF['target']==thisTarget) & (scaledDF['start'] < thisEnd) & (scaledDF['end'] > thisStart))].tolist()
+                    scaledDF.loc[affectedRows, 'scale_corrected_sample_rms'] = scaledDF['sample_rms_orig'][affectedRows] / thisScale
+            except:
+                quit("\nQUITTING: Unable to apply scale factor to sample_rms values; will not be able to select PDFs or Spectrograms\n          Do metrics exist for this network? Does is have data for channels that we run MUSTANG metrics on?")
         
         boxPlotDictionary = {}
         for channelGroup in actualChannels:
@@ -546,7 +578,10 @@ def doBoxPlots(splitPlots, metricList, metricsRequired, network, stations, locat
                     
                     # If there are too many stations, then only show the top/bottom stations
                     nsta = len(stationList)
-                    height = max(min(0.3*nsta, 0.3*nBoxPlotSta), 2)
+                    if nsta < 10:
+                        height = max(min(0.4*nsta, 0.4*nBoxPlotSta), 2)
+                    else:
+                        height = max(min(0.3*nsta, 0.3*nBoxPlotSta), 2)
                     width = 5
                     
                     
@@ -645,7 +680,10 @@ def doPDFs(splitPlots, actualChannels, scaledDF, startDate, endDate, tolerance, 
         
         df2 = pd.DataFrame({col:vals['scale_corrected_sample_rms'] for col,vals in grouped})
         if df2.isnull().values.all():
-            print(f"WARNING: All stations are null for {channelGroup} sample_rms, bypassing")                            
+            print(f"    WARNING: All stations are null for {channelGroup} sample_rms, bypassing")
+            pdfDictionary[f'{channelGroup}_smallest'] = []
+            pdfDictionary[f'{channelGroup}_greatest'] = []
+            pdfDictionary[f'{channelGroup}_all'] = []                          
             continue
         meds = df2.median(skipna=True)
         meds.sort_values(ascending=True, inplace=True)
@@ -654,7 +692,7 @@ def doPDFs(splitPlots, actualChannels, scaledDF, startDate, endDate, tolerance, 
         ## NOTE: use pdf browser's availability endpoint to determine what channels to expect PDFs for
         
         # 1. lowest corrected sample_rms station.
-        print("  INFO: Searching for lowest corrected sample_rms station")
+        print("    INFO: Searching for lowest corrected sample_rms station")
         for ii in range(len(meds.index)):
             # Starting with the lowest value, make sure that it has enough availability. If not, move on to the next. 
             lowestTarget = meds.index[ii]   # This now contains the quality code
@@ -713,7 +751,7 @@ def doPDFs(splitPlots, actualChannels, scaledDF, startDate, endDate, tolerance, 
         
 
         # 2. largest corrected sample_rms  station
-        print("  INFO: Searching for highest corrected sample_rms station")
+        print("    INFO: Searching for highest corrected sample_rms station")
         for ii in reversed(range(len(meds.index))):
             largestTarget = meds.index[ii]
             largestNSL = largestTarget[:-3]
@@ -773,7 +811,7 @@ def doPDFs(splitPlots, actualChannels, scaledDF, startDate, endDate, tolerance, 
 
         
         # 3. composite stations - entire network
-        print("  INFO: Retrieving composite PDF of all stations")
+        print("    INFO: Retrieving composite PDF of all stations")
 #         print("    --> composite PDF of all stations")
         allTarget = f'{network}.{stations}.{locations}.{channelGroup[0:2]}'
         expectedTargets_all = reportUtils.retrieveExpectedPDFs(allTarget, startDate, endDate)
@@ -814,7 +852,9 @@ def doSpectrograms(splitPlots, actualChannels, topStationsDict, scaledDF, startD
         
         df2 = pd.DataFrame({col:vals['scale_corrected_sample_rms'] for col,vals in grouped})
         if df2.isnull().values.all():
-            print(f"WARNING: All stations are null for {channelGroup} scaled sample_rms, bypassing")                            
+            print(f"    WARNING: All stations are null for {channelGroup} scaled sample_rms, bypassing")                            
+            spectDictionary[f'{channelGroup}_smallest'] = []
+            spectDictionary[f'{channelGroup}_greatest'] = []
             continue
         
         meds = df2.median(skipna=True)
@@ -824,7 +864,7 @@ def doSpectrograms(splitPlots, actualChannels, topStationsDict, scaledDF, startD
         ## NOTE: use pdf browser's availability endpoint to determine what channels to expect noise plots for
         
         # 1. lowest corrected sample_rms station
-        print("  INFO: Searching for lowest corrected sample_rms station")
+        print("    INFO: Searching for lowest corrected sample_rms station")
         for ii in range(len(meds.index)):
             # Starting with the lowest value, make sure that it has enough availability. If not, move on to the next. 
             lowestTarget = meds.index[ii]   # This now contains the quality code
@@ -884,7 +924,7 @@ def doSpectrograms(splitPlots, actualChannels, topStationsDict, scaledDF, startD
         
         
         # 2. largest corrected sample_rms station
-        print("  INFO: Searching for lowest corrected sample_rms station")
+        print("    INFO: Searching for lowest corrected sample_rms station")
         for ii in reversed(range(len(meds.index))):
             largestTarget = meds.index[ii]
             largestNSL = largestTarget[:-3]
@@ -945,7 +985,7 @@ def doSpectrograms(splitPlots, actualChannels, topStationsDict, scaledDF, startD
 
 ## MAP
 
-def doMap(network, stations, locations, channels, startDate, endDate, basemap, mapFilename):
+def doMap(network, stations, locations, channels, startDate, endDate, basemap, mapFilename, mapformat):
     print("INFO: Generating station map")
     try:
         # Grab the station-level metadata for the network
@@ -974,7 +1014,14 @@ def doMap(network, stations, locations, channels, startDate, endDate, basemap, m
         
         # Write to file - add config={'scrollZoom': False} if want to disable scroll 
         #    (because it can get obnoxious when scrolling through the report)
-        fig.write_html(mapFilename, config={'scrollZoom': False})
+
+        if mapformat == 'html':
+            print(f"    INFO: Writing map as interactive html")
+            fig.write_html(f'{mapFilename}.html', config={'scrollZoom': False})
+        else:
+            print(f"    INFO: Writing map as static {mapformat}")
+            fig.write_image(f'{mapFilename}.{mapformat}')
+        
     except Exception as e:
         print(f'WARNING: Unable to create and save map: {e}')
 
@@ -982,7 +1029,7 @@ def doMap(network, stations, locations, channels, startDate, endDate, basemap, m
     
 ## Write to HTML file
 
-def doReport(splitPlots, services, outfile, channels, network, startDate, endDate, tolerance, nTop, nBottom, metricList, startYear, endYear, actualChannels, avFilesDictionary, boxPlotExampleImage_moved, boxPlotDictionary, stations, locations, pdfDictionary, spectDictionary, mapFilename, metadataDF, availabilityType, metricsWithPlots):
+def doReport(splitPlots, services, outfile, channels, network, startDate, endDate, tolerance, nTop, nBottom, metricList, startYear, endYear, actualChannels, avFilesDictionary, boxPlotExampleImage_moved, boxPlotDictionary, stations, locations, pdfDictionary, spectDictionary, mapFilename, metadataDF, availabilityType, metricsWithPlots, mapformat):
     print(f"INFO: Writing to file {outfile}")
     
     # Create a list of channels to be used throughout the report, for linking to services
@@ -1190,7 +1237,7 @@ def doReport(splitPlots, services, outfile, channels, network, startDate, endDat
     
     
 
-
+    
     style = '<style>' \
             '/* unvisited link */' \
             'a:link {' \
@@ -1314,10 +1361,9 @@ def doReport(splitPlots, services, outfile, channels, network, startDate, endDat
     
     
     
-    
     with open(outfile,'w') as f:
         f.write("<html>")
-                
+             
         f.write(style)
 #         f.write('<div class="div-dark">')
         
@@ -1504,7 +1550,7 @@ def doReport(splitPlots, services, outfile, channels, network, startDate, endDat
             # Some channels, such as VM, do not have noise profiles calculated in MUSTANG, and can be bypassed in this section
             allFiles = pdfDictionary[f'{channel}_smallest'] + pdfDictionary[f'{channel}_greatest'] + pdfDictionary[f'{channel}_all']
             if allFiles == []:
-                print(f"  WARNING: No PDF plots available for {channel[0:2]}, omitting it from the report")
+                print(f"    WARNING: No PDF plots available for {channel[0:2]}, omitting it from the report")
                 continue
             
             pdfLink = f'http://service.iris.edu/mustang/noise-pdf-browser/1/gallery?'\
@@ -1569,7 +1615,7 @@ def doReport(splitPlots, services, outfile, channels, network, startDate, endDat
             # Some channels, such as VM, do not have noise profiles calculated in MUSTANG, and can be bypassed in this section
             allFiles = spectDictionary[f'{channel}_smallest'] + spectDictionary[f'{channel}_greatest']
             if allFiles == []:
-                print(f"  WARNING: No spectrogram plots available for {channel[0:2]}, omitting it from the report")
+                print(f"    WARNING: No spectrogram plots available for {channel[0:2]}, omitting it from the report")
                 continue
             
             spectLink = f'http://service.iris.edu/mustang/noise-pdf-browser/1/spectrogram?' \
@@ -1620,9 +1666,15 @@ def doReport(splitPlots, services, outfile, channels, network, startDate, endDat
         
         f.write(mapIntroText)
         
-        with open(mapFilename, "r") as f2:
-            mapText = f2.read().replace('<html>','').replace('</html>','')
-        f.write(mapText)
+        if mapformat == 'html':
+            with open(f'{mapFilename}.html', "r") as f2:
+                mapText = f2.read().replace('<html>','').replace('</html>','')
+            f.write(mapText)
+        elif mapformat == 'pdf':
+            f.write(f'    <center><embed src="{mapFilename}.{mapformat}" width="800px" height="600px" /></center><br/>')
+        else:
+#              mapformat == 'png':
+            f.write(f'    <center><a href=\"./{mapFilename}.{mapformat}\" target="_blank"><img src="{mapFilename}.{mapformat}"></a></center><br/>')
         
         f.write('<br/>')
         f.write('<hr style="width:100%;color:lightgray">')
@@ -1668,7 +1720,9 @@ def doReport(splitPlots, services, outfile, channels, network, startDate, endDat
         ## WRAP IT UP
         f.write("</body>");
     f.close();
-        
+    
+
+   
 def doZip(outdir, outfile):    
     print(f"INFO: Report written to {outdir}/{outfile} at {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     # Create a zipped version of the report
@@ -1699,6 +1753,7 @@ def main():
         --includeoutliers=: whether to include outliers in the boxplots, True/False; defaults to False
         --spectralrange=: power range to use in the PDFs and spectrograms, comma separated values:  min, max; defaults depend on channel type
         --basemap=: the name of the basemap to be used for the map; defaults to 'stamen-terrain'
+        --mapformat=: format of the map image, option provided primarily to facilitate converting the report to PDF: html, png, jpeg, svg, pdf; defaults to 'html'
     If PIQQA is not working as expected, ensure that the conda environment is activated
     '''
         
@@ -1718,6 +1773,7 @@ def main():
     spectColorPalette =  'RdYlBu'
     includeOutliers = False
     basemap = "stamen-terrain"
+    mapformat = 'html'
     
     tolerance = 60
     
@@ -1766,6 +1822,8 @@ def main():
             metricList = [x.strip() for x in arg.split('=')[1].split(',')]
         elif arg.lower().startswith('--basemap='):
             basemap = arg.split('=')[1]
+        elif arg.lower().startswith('--mapformat='):
+            mapformat = arg.split('=')[1]
         elif arg.lower() == "piqqa.py":
             continue
         else:
@@ -1859,7 +1917,7 @@ def main():
     except:
         print(f"WARNING: Could not find boxplot example image - {boxplotExampleImage}")
     
-    mapFilename = f'{imageDir}/{network}_stationMap.html'
+    mapFilename = f'{imageDir}/{network}_stationMap'
     
     ########
     
@@ -1881,10 +1939,10 @@ def main():
     [splitPlots, spectDictionary] = doSpectrograms(splitPlots, actualChannels, topStationsDict, scaledDF, startDate, endDate, tolerance, userDefinedPowerRange, powerRanges, spectColorPalette, imageDir)
     
     # Generate Station Map
-    metadataDF = doMap(network, stations, locations, channels, startDate, endDate, basemap, mapFilename)
+    metadataDF = doMap(network, stations, locations, channels, startDate, endDate, basemap, mapFilename, mapformat)
     
     # Create the Report
-    doReport(splitPlots, services, outfile, channels, network, startDate, endDate, tolerance, nTop, nBottom, metricList, startYear, endYear, actualChannels, avFilesDictionary, boxPlotExampleImage_moved, boxPlotDictionary, stations, locations, pdfDictionary, spectDictionary, mapFilename, metadataDF, availabilityType, metricsWithPlots)
+    doReport( splitPlots, services, outfile, channels, network, startDate, endDate, tolerance, nTop, nBottom, metricList, startYear, endYear, actualChannels, avFilesDictionary, boxPlotExampleImage_moved, boxPlotDictionary, stations, locations, pdfDictionary, spectDictionary, mapFilename, metadataDF, availabilityType, metricsWithPlots, mapformat)
     
     # Zip the report 
     doZip(outdir, outfile)
