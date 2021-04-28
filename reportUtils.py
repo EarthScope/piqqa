@@ -15,47 +15,109 @@ import re
 
 
 
-def getAvailability(snclqs, startDate, endDate, tolerance):
-    
+def getAvailability(snclqs, startDate, endDate, tolerance, avtype):
     availabilityDF = pd.DataFrame()
     services = []
-    for snclq in snclqs:
-        snclqList = snclq.split('.')
-        n =snclqList[0]
-        s = snclqList[1]
-        l = snclqList[2]
-        if l == '':
-            luse = '--'
-        else:
-            luse = l
-        c = snclqList[3]
-        q = snclqList[4]
+    
+    
+    if avtype == '':     
+        for snclq in snclqs:
+            snclqList = snclq.split('.')
+            n =snclqList[0]
+            s = snclqList[1]
+            l = snclqList[2]
+            if l == '':
+                luse = '--'
+            else:
+                luse = l
+            c = snclqList[3]
+            q = snclqList[4]
+            
+            if q == "M":
+                service = "fdsnws"
+            elif q == "D":
+                service = "ph5ws"
+            
+            if service not in services:
+                services.append(service)
+
+            URL = f'http://service.iris.edu/{service}/availability/1/query?format=text&' \
+                  f'net={n}&sta={s}&loc={luse}&cha={c}&quality={q}&' \
+                  f'starttime={startDate}&endtime={endDate}&orderby=nslc_time_quality_samplerate&' \
+                  f'mergegaps={tolerance}&includerestricted=true&nodata=404' 
+            try:   
+                tmpDF = pd.read_csv(URL, sep=' ', dtype={'Location': str, 'Station': str}, parse_dates=['Earliest','Latest'])
+                tmpDF['staloc'] = f'{s}.{luse}'
+                availabilityDF = availabilityDF.append(tmpDF, ignore_index=True)
+            except Exception as e:
+                pass
+     
+     
+    elif avtype == 'extents': 
+        # Don't loop over the stations unless necessary
+        nets = ','.join(list(set([n.split('.')[0] for n in snclqs])))
+        stas = ','.join(list(set([n.split('.')[1] for n in snclqs])))
+        stas = "*"
+        locs = ','.join(list(set([n.split('.')[2] for n in snclqs])))
+        if locs == "":
+            locs = '*'
+        chans = ','.join(list(set([n.split('.')[3] for n in snclqs])))
+        qs = ','.join(list(set([n.split('.')[4] for n in snclqs])))
         
-        
-        if q == "M":
-            service = "fdsnws"
-        elif q == "D":
-            service = "ph5ws"
+        if qs == 'D':
+            service = 'ph5ws'
+        elif qs == 'M':
+            service = 'fdsnws'
         
         if service not in services:
             services.append(service)
-            
-        URL = f'http://service.iris.edu/{service}/availability/1/query?format=text&' \
-              f'net={n}&sta={s}&loc={luse}&cha={c}&quality={q}&' \
-              f'starttime={startDate}&endtime={endDate}&orderby=nslc_time_quality_samplerate&' \
-              f'mergegaps={tolerance}&includerestricted=true&nodata=404' 
-           
-        try:   
-            tmpDF = pd.read_csv(URL, sep=' ', dtype={'Location': str, 'Station': str}, parse_dates=['Earliest','Latest'])
-            tmpDF['staloc'] = f'{s}.{luse}'
-        except:
-            pass
         
+        URL = f'http://service.iris.edu/{service}/availability/1/extent?format=text&' \
+              f'net={nets}&sta={stas}&loc={locs}&cha={chans}&quality={qs}&' \
+              f'starttime={startDate}&endtime={endDate}&orderby=nslc_time_quality_samplerate&' \
+              f'includerestricted=true&nodata=404'    
+#         print("TEMP: URL\n%s" % URL)
         try:
-            availabilityDF = availabilityDF.append(tmpDF, ignore_index=True)
+            availabilityDF = pd.read_csv(URL, sep=' ', dtype={'Location': str, 'Station': str}, parse_dates=['Earliest','Latest'])
         except:
-            pass
+            print("        INFO: Unable to retrieve availability in one go, trying to loop over stations instead")
             
+            for snclq in snclqs:
+                snclqList = snclq.split('.')
+                n =snclqList[0]
+                s = snclqList[1]
+                l = snclqList[2]
+                if l == '':
+                    luse = '--'
+                else:
+                    luse = l
+                c = snclqList[3]
+                q = snclqList[4]
+                
+                if q == "M":
+                    service = "fdsnws"
+                elif q == "D":
+                    service = "ph5ws"
+                
+                if service not in services:
+                    services.append(service)
+    
+                URL = f'http://service.iris.edu/{service}/availability/1/extent?format=text&' \
+                      f'net={n}&sta={s}&loc={luse}&cha={c}&quality={q}&' \
+                      f'starttime={startDate}&endtime={endDate}&orderby=nslc_time_quality_samplerate&' \
+                      f'&includerestricted=true&nodata=404' 
+                  
+                try:   
+                    tmpDF = pd.read_csv(URL, sep=' ', dtype={'Location': str, 'Station': str}, parse_dates=['Earliest','Latest'])
+                    tmpDF['staloc'] = f'{s}.{luse}'
+                    availabilityDF = availabilityDF.append(tmpDF, ignore_index=True)
+                except:
+                    pass
+            
+            
+            
+            
+        
        
 #     availabilityDF = availabilityDF.apply(lambda x: x.str.strip() if x.dtype == "object" else x)   
     availabilityDF.rename(columns=lambda x: x.strip().lower(), inplace=True)
@@ -96,7 +158,12 @@ def addMetricToDF(metric, DF, network, stations, locations, channels, startDate,
     URL = f"http://service.iris.edu/mustang/measurements/1/query?metric={metric}&net={network}&" \
           f"sta={','.join(stations)}&loc={','.join(locations)}&chan={','.join(chanList)}" \
           f'&format=text&timewindow={startDate},{endDate}&nodata=404'
-
+    
+    # temporary
+    if ('ts_' in metric):
+        URL = f"http://mustangappbeta01.iris.washington.edu:8080/mustang/measurements/1/query?metric={metric}&net={network}&" \
+              f"sta={','.join(stations)}&loc={','.join(locations)}&chan={','.join(chanList)}" \
+              f'&format=text&timewindow={startDate},{endDate}&nodata=404'
     try:
         tempDF = retrieveMetrics(URL, metric)
     except Exception as e:
@@ -120,7 +187,7 @@ def addMetricToDF(metric, DF, network, stations, locations, channels, startDate,
             DF = pd.merge(DF, tempDF, how='outer', left_on=['target','snclq', 'station', 'start', 'end'], right_on=['target','snclq','station', 'start', 'end'])
         except:
             print(f"    ERROR: Something went wrong with the {metric}")
-        
+     
     return DF
         
 def getMetadata(network, stations, locations, channels, startDate, endDate, level):
@@ -213,12 +280,12 @@ def retrieveExpectedPDFs(smallestNSLC, startDate, endDate):
     response =  requests.get(URL) 
     if response.text.startswith("Error"):
         # Wait 5 seconds and try again
-        print(f"--> Error retrieving list of expected PDFs for {smallestNSLC}, waiting 5 seconds and trying again")
+        print(f"        --> Error retrieving list of expected PDFs for {smallestNSLC}, waiting 5 seconds and trying again")
         time.sleep(5)
         response =  requests.get(URL) 
         if response.text.startswith("Error"):
-            print(f"--> Unable to retrieve PDF list for {smallestNSLC}")
-            print(response.text)
+            print(f"        --> Unable to retrieve PDF list for {smallestNSLC}")
+#             print(response.text)
             expectedTargets = list()
         
     # doing it this way so that this section will run if either the first or second attempt was successful        
