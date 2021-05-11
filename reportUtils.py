@@ -150,9 +150,11 @@ def addMetricToDF(metric, DF, network, stations, locations, channels, startDate,
     chanList = list()
     for chan in channels.split(','):
         if len(chan) == 2:
-            chan = f"{chan}Z,{chan}3"
+#             chan = f"{chan}Z,{chan}1"
+            chan = f"{chan}Z"
         if chan == "*":
-            chan = "??Z,??3"
+#             chan = "??Z,??1"
+            chan = "??Z"
         chanList.append(chan)
     
     URL = f"http://service.iris.edu/mustang/measurements/1/query?metric={metric}&net={network}&" \
@@ -203,9 +205,11 @@ def getMetadata(network, stations, locations, channels, startDate, endDate, leve
     chanList = list()
     for chan in channels.split(','):
         if len(chan) == 2:
-            chan = f"{chan}Z,{chan}3"
+#             chan = f"{chan}Z,{chan}1"
+            chan = f"{chan}Z"
         if chan == "*":
-            chan = "??Z,??3"
+#             chan = "??Z,??1"
+            chan = "??Z"
         chanList.append(chan)
      
 
@@ -295,9 +299,17 @@ def retrieveExpectedPDFs(smallestNSLC, startDate, endDate):
     return expectedTargets
 
 def getPDF(target, startDate, endDate, spectPowerRange, imageDir):
+    
+    plot_titlefont=20
+    plot_subtitlefont=18 
+    plot_axisfont=16
+    plot_labelfont=18
+    plotArguments = f"plot.titlefont.size={plot_titlefont}&plot.subtitlefont.size={plot_subtitlefont}" \
+                    f"&plot.axisfont.size={plot_axisfont}&plot.labelfont.size={plot_labelfont}"
+                    
     URL = f"http://service.iris.edu/mustang/noise-pdf/1/query?target={target}&" \
           f"starttime={startDate}&endtime={endDate}&format=plot&plot.interpolation=bicubic&nodata=404&" \
-          f"plot.power.min={spectPowerRange[0]}&plot.power.max={spectPowerRange[1]}"
+          f"plot.power.min={spectPowerRange[0]}&plot.power.max={spectPowerRange[1]}&{plotArguments}"
 
     response = requests.get(URL)
     filename = (f"{imageDir}/{target}_PDF.png").replace('*','').replace('?','')
@@ -310,9 +322,16 @@ def getPDF(target, startDate, endDate, spectPowerRange, imageDir):
     
 def getSpectrogram(target, startDate, endDate, spectPowerRange, spectColorPalette, imageDir):
     powerRange = ','.join([str(x) for x in spectPowerRange])
+    plot_titlefont=20
+    plot_subtitlefont=18 
+    plot_axisfont=16
+    plot_labelfont=18
+    plotArguments = f"plot.titlefont.size={plot_titlefont}&plot.subtitlefont.size={plot_subtitlefont}" \
+                    f"&plot.axisfont.size={plot_axisfont}&plot.labelfont.size={plot_labelfont}"
+                    
     URL = f"http://service.iris.edu/mustang/noise-spectrogram/1/query?target={target}&" \
           f"starttime={startDate}&endtime={endDate}&output=power&format=plot&plot.color.palette={spectColorPalette}&" \
-          f"plot.powerscale.range={powerRange}&plot.horzaxis=time&plot.time.matchrequest=true&" \
+          f"plot.powerscale.range={powerRange}&plot.horzaxis=time&plot.time.matchrequest=true&{plotArguments}&" \
           f"plot.time.tickunit=auto&plot.time.invert=false&plot.powerscale.show=true&plot.powerscale.orientation=horz&nodata=404" 
     
     

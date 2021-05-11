@@ -7,7 +7,7 @@ Created on Aug 18, 2020
 '''
 
 # version = 'v1.0'
-version = 'v. 0.8'
+version = 'v. 0.9'
 
 import reportUtils
 import pandas as pd
@@ -65,8 +65,6 @@ def doAvailability(splitPlots, startDate, endDate, network, stations, locations,
     avFilesDictionary = {}  # collects plot filenames
     topStationsDict = {}    # list of stations in top X (default 15) for channel group, or all stations if the channel group is small 
     services_used = list()  # used to know which services to link to at the bottom of the availability section
-#     services = ['fdsnws']
-#     avDictionary = {}       # earliest and latest dates for each target, as well as the ts_percent_availabilty_total between those two dates.  
     
     totalElapsedTime = (datetime.datetime.fromisoformat(endDate).timestamp() -  datetime.datetime.fromisoformat(startDate).timestamp())/ 86400
     gapBuffer = 0.001    # if the gap is smaller than this percent of the total elapsed time, then it will be plotted as this percent of the total time
@@ -79,7 +77,7 @@ def doAvailability(splitPlots, startDate, endDate, network, stations, locations,
     try:
         actualChannels = sorted(list(set(allMetadataDF['channel'])))
     except:
-        quit("\nQUITTING: No information found for network and times, is something wrong? Is there data at IRIS for this network? Does this network have channels with the Z/3 component?")
+        quit("\nQUITTING: No information found for network and times, is something wrong? Is there data at IRIS for this network? Does this network have channels with the Z component?")
 
     ## Loop over the channel groups
     for channelGroup in actualChannels:
@@ -168,8 +166,6 @@ def doAvailability(splitPlots, startDate, endDate, network, stations, locations,
             
                 
             topStationsAvDF, services = reportUtils.getAvailability(topStations['snclq'], startDate, endDate, tolerance,'')
-#             if topStationsAvDF.empty:
-#                 continue
             for service in services:
                 if service not in services_used:
                     services_used.append(service)
@@ -321,7 +317,6 @@ def doAvailability(splitPlots, startDate, endDate, network, stations, locations,
                         metadatalines.append( [ ( mpl.dates.date2num(line['starttime']), stn ) , ( mpl.dates.date2num(datetime.datetime.now()), stn ) ] )
                     else:
                         metadatalines.append( [ ( mpl.dates.date2num(line['starttime']), stn ) , ( mpl.dates.date2num(line['endtime']), stn ) ] )
-#                     metadatalines.append( [ ( mpl.dates.date2num(line['starttime']), stn ) , ( mpl.dates.date2num(line['endtime']), stn ) ] )
             
                 stn += 1
             
@@ -369,7 +364,6 @@ def doAvailability(splitPlots, startDate, endDate, network, stations, locations,
             
             
             ## Then repeat for the case where they aren't broken up by top/bottom
-        
         else:
         
             height = max(min(0.3*nsta, 0.3*nBoxPlotSta), 2)
@@ -438,7 +432,6 @@ def doAvailability(splitPlots, startDate, endDate, network, stations, locations,
                         metadatalines.append( [ ( mpl.dates.date2num(line['starttime']), stn ) , ( mpl.dates.date2num(datetime.datetime.now()), stn ) ] )
                     else:
                         metadatalines.append( [ ( mpl.dates.date2num(line['starttime']), stn ) , ( mpl.dates.date2num(line['endtime']), stn ) ] )
-#                     metadatalines.append( [ ( mpl.dates.date2num(line['starttime']), stn ) , ( mpl.dates.date2num(line['endtime']), stn ) ] )
             
                 stn += 1
             
@@ -526,39 +519,59 @@ def doBoxPlots(splitPlots, metricList, metricsRequired, network, stations, locat
         print(f"    INFO: Retrieving metadata for {actualChannelsText}")
         metadataDF = reportUtils.getMetadata(network, stations, locations, actualChannelsText, startDate, endDate,'channel')
         
-        
-    
-        
-        
+
         # Subset the ts_num_gaps to only encompass the days from the first to the last day of data for each target
-        if 'ts_num_gaps' in metricList:
+        if ('ts_num_gaps' in metricDF.columns) or ('ts_num_gaps_total' in metricDF.columns):
             print("    INFO: Subsetting ts_num_gaps to the data start and end dates for each target")
                
             ## Get the availability extents for all targets
             extentsDF, service = reportUtils.getAvailability(metricDF.snclq.unique(), startDate, endDate, "", "extents")
    
-            # Create a temporary dataframe that only has the target-days that have availability, fillin it with ts_num_gaps values
-            tmpDF = pd.DataFrame()
-            for idx, row in extentsDF.iterrows():
-                thisTarget = f"{row['network']}.{row['station']}.{row['location'].replace('--','')}.{row['channel']}"
-                thisStartTime = row['earliest'].replace(hour=0,minute=0,second=0,microsecond=0, nanosecond=0)
-                   
-                thisDF = metricDF[(metricDF['target']==str(thisTarget)) & (metricDF['start'] >= thisStartTime.to_datetime64()) & (metricDF['start'] <= row['latest'].to_datetime64())]
-                if tmpDF.empty:
-                    tmpDF = thisDF.copy()
-                else:
-                    tmpDF = tmpDF.append(thisDF, ignore_index=True)
-               
-            columnsToKeep = ['snclq', 'start', 'end',  'target', 'station', 'ts_num_gaps']
-            columnsToRemove = [c for c in tmpDF.columns if c not in columnsToKeep]
    
-            tmpDF.drop(columnsToRemove, axis=1, inplace=True)
-            tmpDF.rename(columns = {'ts_num_gaps': 'ts_num_gaps_subset'}, inplace=True)   
-               
-            metricDF = pd.merge(metricDF, tmpDF, how='outer', on=['target','snclq','station', 'start', 'end'])
-            metricDF.drop('ts_num_gaps', axis=1, inplace=True)
-            metricDF.rename(columns={'ts_num_gaps_subset':'ts_num_gaps'}, inplace=True)
+            ## ts_num_gaps
+            if 'ts_num_gaps' in metricDF.columns:
+                # Create a temporary dataframe that only has the target-days that have availability, fillin it with ts_num_gaps values
+                tmpDF = pd.DataFrame()
+                for idx, row in extentsDF.iterrows():
+                    thisTarget = f"{row['network']}.{row['station']}.{row['location'].replace('--','')}.{row['channel']}"
+                    thisStartTime = row['earliest'].replace(hour=0,minute=0,second=0,microsecond=0, nanosecond=0)
+                       
+                    thisDF = metricDF[(metricDF['target']==str(thisTarget)) & (metricDF['start'] >= thisStartTime.to_datetime64()) & (metricDF['start'] <= row['latest'].to_datetime64())]
+                    if tmpDF.empty:
+                        tmpDF = thisDF.copy()
+                    else:
+                        tmpDF = tmpDF.append(thisDF, ignore_index=True)
+                   
+                columnsToKeep = ['snclq', 'start', 'end',  'target', 'station', 'ts_num_gaps']
+                columnsToRemove = [c for c in tmpDF.columns if c not in columnsToKeep]
+       
+                tmpDF.drop(columnsToRemove, axis=1, inplace=True)
+                
+                
+                tmpDF.rename(columns = {'ts_num_gaps': 'ts_num_gaps_subset'}, inplace=True)   
+                   
+                metricDF = pd.merge(metricDF, tmpDF, how='outer', on=['target','snclq','station', 'start', 'end'])
+                metricDF.drop('ts_num_gaps', axis=1, inplace=True)
+                metricDF.rename(columns={'ts_num_gaps_subset':'ts_num_gaps'}, inplace=True)
 
+
+            ## ts_num_gaps_total
+            if 'ts_num_gaps_total' in metricDF.columns:
+                ## FILL IN WHAT HAS TO HAPPEN HERE: Remove any targets from metricDF['ts_num_gaps_total'] if it isn't in the availability extents dataframe
+                ## since that means there's no data for that target
+                extentsDF['target'] = extentsDF['network'].str.cat(extentsDF['station'].str.cat(extentsDF['location'].str.cat(extentsDF['channel'],sep="."),sep="."),sep=".").replace('--','', regex=True)
+                availabilityStations = extentsDF.target.unique() 
+                columns = [metricDF['ts_num_gaps_total'], metricDF['start'], metricDF['end'], metricDF['target']]
+                headers = ['ts_num_gaps_total','start','end','target']
+                tmpDF = pd.concat(columns, axis=1, keys=headers)
+
+                
+                # Only station that have availability extents should be included, all others have no data.
+                tmpDF = tmpDF[tmpDF['target'].isin(availabilityStations)]
+                tmpDF.rename(columns = {'ts_num_gaps_total': 'ts_num_gaps_total_subset'}, inplace=True) 
+                metricDF = pd.merge(metricDF, tmpDF, how='outer', on=['target','start', 'end'])
+                metricDF.drop('ts_num_gaps_total', axis=1, inplace=True)
+                metricDF.rename(columns={'ts_num_gaps_total_subset':'ts_num_gaps_total'}, inplace=True)
 
         scaledDF= metricDF.copy()   
         # scale sample_rms by "scale" from station ws
@@ -604,7 +617,7 @@ def doBoxPlots(splitPlots, metricList, metricsRequired, network, stations, locat
                         print(f"        WARNING: All stations are null for {channelGroup} {metric}, bypassing")                         
                         continue
                     
-                    if metric == "num_gaps" or metric == "ts_num_gaps" or metric == "ts_num_gaps_total":
+                    if metric == "num_gaps" or metric == "ts_num_gaps":
                         meds = df2.mean(skipna=True).dropna(how='all')
                         plotOrder="sorted by mean value"
                     else:
@@ -663,7 +676,6 @@ def doBoxPlots(splitPlots, metricList, metricsRequired, network, stations, locat
                         
                     else:
                         # Create and save the boxplot for that metric
-                        
                         if includeOutliers:
                             boxplot = df2.boxplot(vert=False, grid=False, figsize=(width, height), color={'medians': 'black', 'boxes':'black', 'whiskers':'black'})
                         else:
@@ -717,14 +729,9 @@ def doPDFs(splitPlots, actualChannels, scaledDF, startDate, endDate, tolerance, 
         
         if channelGroup.startswith('VM'):
             print(f"INFO: Bypassing PDFs for {channelGroup}")
-#             pdfDictionary[f'{channelGroup}_smallest'] = []
-#             pdfDictionary[f'{channelGroup}_greatest'] = []
-#             pdfDictionary[f'{channelGroup}_all'] = [] 
             continue
             
-        
         print(f"INFO: Retrieving PDFs for {channelGroup}")
-        
 
         # Use the dataframe with the SCALED sample_rms to determine the top/bottom station/target        
         tmpDF = scaledDF[scaledDF['target'].str.endswith(channelGroup)]
@@ -738,9 +745,6 @@ def doPDFs(splitPlots, actualChannels, scaledDF, startDate, endDate, tolerance, 
         
         if df2.isnull().values.all():
             print(f"    WARNING: All stations are null for {channelGroup} sample_rms, bypassing")
-#             pdfDictionary[f'{channelGroup}_smallest'] = []
-#             pdfDictionary[f'{channelGroup}_greatest'] = []
-#             pdfDictionary[f'{channelGroup}_all'] = []                          
             continue
         meds = df2.median(skipna=True).dropna(how='all')
         meds.sort_values(ascending=True, inplace=True)
@@ -848,7 +852,6 @@ def doPDFs(splitPlots, actualChannels, scaledDF, startDate, endDate, tolerance, 
             largestNSL = largestTarget[:-3]
             
         
-#         pdfDictionary[f'{channelGroup}_greatest'] = []      # assigned here in case the largest station == lowest station  (ie, only one station meets selection criteria)
         if not lowestNSLC == largestNSL:
             # Get a list of channels that should have noise profiles for this station  
             expectedTargets_largest = reportUtils.retrieveExpectedPDFs(largestNSL, startDate, endDate)
@@ -867,7 +870,6 @@ def doPDFs(splitPlots, actualChannels, scaledDF, startDate, endDate, tolerance, 
                     spectPowerRange = userDefinedPowerRange
                 
                 pdfFile = reportUtils.getPDF(target, startDate, endDate, spectPowerRange, imageDir)
-    #             spectFile = reportUtils.getSpectrogram(target, startDate, endDate, spectPowerRange, spectColorPalette, imageDir)
                 pdfFiles.append(pdfFile)
                 
             pdfDictionary[f'{channelGroup}_greatest'] = sorted(pdfFiles)
@@ -875,7 +877,6 @@ def doPDFs(splitPlots, actualChannels, scaledDF, startDate, endDate, tolerance, 
         
         # 3. composite stations - entire network
         print("    INFO: Retrieving composite PDF of all stations")
-#         print("    --> composite PDF of all stations")
         allTarget = f'{network}.{stations}.{locations}.{channelGroup[0:2]}'
         expectedTargets_all = reportUtils.retrieveExpectedPDFs(allTarget, startDate, endDate)
         expectedChannels = list(set([x.split('.')[3] for x in expectedTargets_all]))
@@ -908,8 +909,6 @@ def doSpectrograms(splitPlots, actualChannels, topStationsDict, scaledDF, startD
         
         if channelGroup.startswith('VM'):
             print(f"INFO: Bypassing Spectrograms for {channelGroup}")
-#             spectDictionary[f'{channelGroup}_smallest'] = []
-#             spectDictionary[f'{channelGroup}_greatest'] = []
             continue
         
         print(f"INFO: Retrieving Spectrograms for {channelGroup}")
@@ -918,8 +917,6 @@ def doSpectrograms(splitPlots, actualChannels, topStationsDict, scaledDF, startD
             topStations = topStationsDict[channelGroup]
         except:
             print(f"    WARNING: Bypassing {channelGroup} because there was no availability for it for this time period")
-#             spectDictionary[f'{channelGroup}_smallest'] = []
-#             spectDictionary[f'{channelGroup}_greatest'] = []
             continue
         
         
@@ -936,13 +933,10 @@ def doSpectrograms(splitPlots, actualChannels, topStationsDict, scaledDF, startD
         
         if df2.isnull().values.all():
             print(f"    WARNING: All stations are null for {channelGroup} scaled sample_rms, bypassing")                            
-#             spectDictionary[f'{channelGroup}_smallest'] = []
-#             spectDictionary[f'{channelGroup}_greatest'] = []
             continue
         
         meds = df2.median(skipna=True).dropna(how='all')
         meds.sort_values(ascending=True, inplace=True)
-#         sortedDF = df2[meds.index]
 
         ## NOTE: use pdf browser's availability endpoint to determine what channels to expect noise plots for
         
@@ -1049,7 +1043,6 @@ def doSpectrograms(splitPlots, actualChannels, topStationsDict, scaledDF, startD
             largestNSL = largestTarget[:-3]
             
         
-#         spectDictionary[f'{channelGroup}_greatest'] = []    
         if not lowestNSLC == largestNSL:
             # Then we only have one target to display
             
@@ -1121,16 +1114,18 @@ def doMap(network, stations, locations, channels, startDate, endDate, basemap, m
     
 ## Write to HTML file
 
-def doReport(splitPlots, services, outfile, channels, network, startDate, endDate, tolerance, nTop, nBottom, metricList, startYear, endYear, actualChannels, avFilesDictionary, boxPlotExampleImage_moved, boxPlotDictionary, stations, locations, pdfDictionary, spectDictionary, mapFilename, metadataDF, availabilityType, metricsWithPlots, mapformat, includeOutliers):
+def doReport(splitPlots, services, outfile, channels, network, startDate, endDate, tolerance, nTop, nBottom, metricList, startYear, endYear, actualChannels, avFilesDictionary, boxPlotExampleImage_moved, boxPlotDictionary, stations, locations, pdfDictionary, spectDictionary, mapFilename, metadataDF, availabilityType, metricsWithPlots, mapformat, includeOutliers, spectColorPalette, powerRanges):
     print(f"INFO: Writing to file {outfile}")
     
     # Create a list of channels to be used throughout the report, for linking to services
     chans = []
     for chan in channels.split(','):
         if len(chan) == 2:
-            chan = f'{chan}Z,{chan}3'
+#             chan = f'{chan}Z,{chan}1'
+            chan = f'{chan}Z'
         if chan == "*":
-            chan = "??Z,??3"
+#             chan = "??Z,??1"
+            chan = "??Z"
         chans.append(chan)
 
     
@@ -1230,12 +1225,17 @@ def doReport(splitPlots, services, outfile, channels, network, startDate, endDat
     
     
     ###### BOXPLOTS ###### 
-    boxPlotIntroText = '''
-    <p>The boxplots in this section illustrate the statistical distribution of selected MUSTANG metrics, 
-    in a way that can quickly display the range of values across the network. Stations with anomalous metric values may 
-    have data or metadata problems. The default metrics presented are ts_num_gaps (add link), ts_num_gaps_total (add link), 
-    and sample_rms (add links), although these choices are configurable in the piqqa.py script that generated this report.</p>  
-    '''
+    defaultMetricText = "The metrics presented here are"
+    for metric in metricList:
+        defaultMetricText = f'{defaultMetricText} <a href=\"http://service.iris.edu/mustang/metrics/docs/1/desc/{metric}/\" ' \
+                            f'target=\"_blank\">{metric}</a>,'
+        if metric == metricList[-2]:
+                defaultMetricText = f'{defaultMetricText} and'
+    defaultMetricText = f'{defaultMetricText} although these choices are configurable when running the script that generated this report.'
+    
+    boxPlotIntroText = f'<p>The boxplots in this section illustrate the statistical distribution of selected MUSTANG metrics, ' \
+                       f'in a way that can quickly display the range of values across the network. Stations with anomalous metric values may ' \
+                       f'have data or metadata problems. {defaultMetricText}</p>'
     
     ## TO DO: ? Put this into a loop over all metrics in metricList and grab the 2 sentence description from a dictionary in reportUtils
     if "ts_num_gaps" in metricList:
@@ -1259,14 +1259,13 @@ def doReport(splitPlots, services, outfile, channels, network, startDate, endDat
     if "sample_rms" in metricList:                  
         boxPlotIntroText = f'{boxPlotIntroText}<p>The sample_rms metric is the root-mean-square (RMS) variance (also known as the standard deviation) of sample ' \
                            f'counts per day and is a statistical measure of amplitude variability. This boxplot can potentially identify ' \
-                           f'instrumentation problems or metadata errors.</p>'
+                           f'instrumentation problems or metadata errors. For all uses in this report, the sample_rms is scaled by the metadata ' \
+                           f'sensitivity to better compare across instrumentation.</p>'
 
     
-    boxPlotIntroText = f'{boxPlotIntroText} <p>For all uses in this report, the sample_rms is scaled by the metadata sensitivity to better compare ' \
-                       f'across instrumentation.</p>' \
-                       f'<p>Metric boxplots are generated using the Z component for each channel group (for example, BHZ, HHZ, HNZ) ' \
+    boxPlotIntroText = f'{boxPlotIntroText}<p>Metric boxplots are generated using the Z component for each channel group (for example, BHZ, HHZ, HNZ) ' \
                        f'for each metric included in the report, and are sorted by their median value. ' \
-                       f'This is true for all metrics except for num_gaps, ts_num_gaps, and ts_num_gaps_total, which are sorted by mean value.</p>' 
+                       f'This is true for all metrics except for num_gaps and ts_num_gaps, which are sorted by mean value.</p>' 
     
     
     boxPlotIntroText2 = f'The boxplots contain the following features:<br/>' \
@@ -1361,51 +1360,6 @@ def doReport(splitPlots, services, outfile, channels, network, startDate, endDat
 
     spectrgramPlotIntoText = f'{spectrgramPlotIntoText}</ol>' 
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-#     if availabilityType == 'ts_percent_availability_total':
-#         spectAvailDescription1 = "calculated over the entire requested report timespan and agnostic to the metadata extents for the channel"
-#         spectAvailDescription2 = "calculated between the first and last timestamp of the data for that channel"
-#     else:
-#         spectAvailDescription1 = "calculated as an average of daily values, which are bound by the metadata extents for the channel"
-#         spectAvailDescription2 = "calculated as an average of daily values between the first day and final day of data for the channel"
-#      
-#                  
-#     spectrgramPlotIntoText = f'<p>The daily-PDF-mode spectrogram plots in this section illustrate the power spectra values across time for two stations selected '\
-#                              f'primarily for data availability, as described in the above availability plot section. For the purpose of showing potentially '\
-#                              f'different station behavior, they are secondarily selected by median daily-RMS variance values (<a href=\"http://service.iris.edu/mustang/metrics/docs/1/desc/sample_rms/\" ' \
-#                             f'target=\"_blank\">sample_rms</a> metric, '\
-#                              f'scaled by metadata sensitivity) as described in the above PDF plot section.</p>'
-#     
-#     if splitPlots == 1:
-#         # Then it needs to talk about 1) that stations are selected from the top group, and 2) how that top group was determined (what metric)
-#         spectrgramPlotIntoText = f'{spectrgramPlotIntoText}<p>Stations are first selected from the list of the {nTop} stations with the highest percent of data '\
-#                                  f'availability for that channel group (<a href=\"http://service.iris.edu/mustang/metrics/docs/1/desc/{availabilityType}/\" ' \
-#                                  f'target=\"_blank\">{availabilityType}</a>  metric, {spectAvailDescription1}).'
-# 
-#         
-#         
-#         spectrgramPlotIntoText = f'{spectrgramPlotIntoText} From this subset of stations, the two plots display spectrograms for the stations with the highest '\
-#                                  f'and lowest median daily-RMS variance, omitting stations with '\
-#                                  f'less than 75% data availability ({availabilityType} metric, {spectAvailDescription2}). '\
-#                                  f'If no station meets the 75% availability criteria, the stations with the highest and lowest median '\
-#                                  f'daily-RMS variance values are selected from the list of {nTop} stations.</p>'
-#         
-#     else:
-#         spectrgramPlotIntoText = f'{spectrgramPlotIntoText} From the list of all stations for this channel set, the two plots display spectrograms for the stations '\
-#                                  f'with the highest and lowest median daily-RMS variance, '\
-#                                  f'omitting stations with less than 75% data availability ({availabilityType} metric, {spectAvailDescription2}). '\
-#                                  f'If no station meets the 75% availability criteria, the stations with the highest '\
-#                                  f'and lowest median daily-RMS variance values are selected</p>'
-        
     spectrgramPlotIntoText = f'{spectrgramPlotIntoText}<p>Detailed information about these spectrogram plots and how MUSTANG ' \
                              f'generates them can be found by visiting the <a href=\"http://service.iris.edu/mustang/noise-spectrogram/' \
                              f'docs/1/help/\" target=\"_blank\"> noise-spectrogram web service</a>.</p>'\
@@ -1553,22 +1507,18 @@ def doReport(splitPlots, services, outfile, channels, network, startDate, endDat
     
     
     
-    
     with open(outfile,'w') as f:
         f.write("<html>")
              
         f.write(style)
-#         f.write('<div class="div-dark">')
         
         f.write("    <head>\n")
-        f.write(f"<meta name=Title content=\"PIQQA Data Quality Report for {network} ({' - '. join([startDate, endDate])})\">\n")
-        f.write(f"<title> PIQQA Data Quality Report for {network} ({' - '. join([startDate, endDate])})</title>\n")
+        f.write(f"<meta name=Title content=\"{network} ({' - '. join([startDate, endDate])}) PIQQA Data Quality Report\">\n")
+        f.write(f"<title>{network} ({' - '. join([startDate, endDate])}) PIQQA Data Quality Report</title>\n")
         f.write("    </head>\n\n");
-#         f.write('</div>')
         
         f.write("    <body>");
         f.write('<div class="div-light">')
-#         f.write(f"<a name='top'></a> <h1>PIQQA Data Quality Report for {network} ({' - '. join([startDate, endDate])})</h1>");
         if startYear == endYear:
             f.write(f"<a name='top'></a> <h1>PIQQA Data Quality Report for {network} ({startYear})</h1>");
         else:
@@ -1581,18 +1531,6 @@ def doReport(splitPlots, services, outfile, channels, network, startDate, endDat
         f.write('<hr style="width:200;text-align:left;margin-left:2;color:lightgray">')
         
         f.write('<br/>')
-#         intro = '''This report is intended as a quick overview of the quality of the data archived for the specified network. 
-#         That includes boxplot summary views of selected metrics, PDFs, and spectrograms. It is recommended
-#         that users may benefit from a more thorough quality assurance inspection of the data, especially if anything
-#         suspicious arises from this report.  
-#         <br/>
-#         <br/>
-#         Data and metadata are stored at the IRIS DMC and the information here reflects the holdings in their archive.  
-#         This report is generated by utilizing their quality assurance system, MUSTANG. 
-#         <br/>
-#         <br/>
-#         To see the metadata holdings, see here:
-#         '''
         f.write(introText)
         f.write("<p></p>");
         
@@ -1646,7 +1584,9 @@ def doReport(splitPlots, services, outfile, channels, network, startDate, endDat
             f.write(f"<h3>{channel[0:2]} channels</h3>")
             f.write("<p></p>");
             f.write('<div class="row">')
-            f.write(f'    <center><a href=\"./{file}\" target="_blank"><img src="{file}" width="100%"></a></center><br/>')
+#             f.write(f'    <center><a href=\"{file}\" target="_blank"><img src="{file}" width="100%"></a></center><br/>')
+            f.write(f'    <center><img src="{file}" width="100%"></center><br/>')
+
             f.write('</div>')
             
 
@@ -1665,19 +1605,20 @@ def doReport(splitPlots, services, outfile, channels, network, startDate, endDat
         
         #### ADD BOXPLOTS   
         f.write('<div class="div-light">')     
-#         f.write('<div class="div-dark">')
-#         f.write('<hr style="width:100%;color:lightgray">')
         f.write("<br/>");
         f.write("<a name='boxplots'></a> <h2>Metric Boxplots</h2>")
         
         # Add intro, boxplot example plot, and rest of intro
         f.write(boxPlotIntroText)
         f.write(boxPlotIntroText2)
-        f.write(f'    <center><a href=\"./{boxPlotExampleImage_moved}\" target="_blank"><img src="{boxPlotExampleImage_moved}" width="50%"></a></center><br/>')
+#         f.write(f'    <center><a href=\"./{boxPlotExampleImage_moved}\" target="_blank"><img src="{boxPlotExampleImage_moved}" width="50%"></a></center><br/>')
+        f.write(f'    <center><img src="{boxPlotExampleImage_moved}" width="50%"></center><br/>')
+
         f.write(boxPlotIntroText3)
         
         
-        f.write("<p></p>");
+        
+        f.write("<br/>");
         
         for channel in actualChannels:
             f.write(f"<h3>{channel[0:2]} channels</h3>")
@@ -1688,7 +1629,8 @@ def doReport(splitPlots, services, outfile, channels, network, startDate, endDat
             files = boxPlotDictionary[f'{channel}']
             for file in files:
                 f.write('  <div class="column">')
-                f.write(f'    <center><a href=\"./{file}\" target="_blank"><img src="{file}"></a></center><br/>')
+#                 f.write(f'    <center><a href=\"./{file}\" target="_blank"><img src="{file}"></a></center><br/>')
+                f.write(f'    <center><img src="{file}"></center><br/>')
                 f.write('  </div>')
                     
             f.write('</div>')
@@ -1719,7 +1661,6 @@ def doReport(splitPlots, services, outfile, channels, network, startDate, endDat
             f.write(f"<li><a href=\"{metricsLinks}\" target=\"_blank\">{metric}</a></li>\n") 
         f.write('</ul>')
         f.write('<br/>')
-#         f.write('<hr style="width:100%;color:lightgray">')
         f.write('<p style="text-align:center"><a href="#top">Back to Top</a></p>')
         f.write('</div>')
         
@@ -1730,7 +1671,6 @@ def doReport(splitPlots, services, outfile, channels, network, startDate, endDat
         #### ADD PDFS 
         f.write('<div class="div-dark">')
         f.write('<hr style="width:100%;color:lightgray">')
-#         f.write('<div class="div-light">')
         f.write("<br/>");
         f.write("<a name='pdfs'></a> <h2>PDF Plots</h2>")
         
@@ -1766,7 +1706,8 @@ def doReport(splitPlots, services, outfile, channels, network, startDate, endDat
                 files = pdfDictionary[f'{channel}_smallest']
                 
                 for file in files:
-                    f.write(f'    <center><a href=\"./{file}\" target="_blank"><img src="{file}"></a></center><br/>')
+#                     f.write(f'    <center><a href=\"./{file}\" target="_blank"><img src="{file}"></a></center><br/>')
+                    f.write(f'    <center><img src="{file}"></center><br/>')
             except:
                 pass
             
@@ -1779,7 +1720,8 @@ def doReport(splitPlots, services, outfile, channels, network, startDate, endDat
                 try:
                     files = pdfDictionary[f'{channel}_greatest']
                     for file in files:
-                        f.write(f'    <center><a href=\"./{file}\" target="_blank"><img src="{file}"></a></center><br/>')
+#                         f.write(f'    <center><a href=\"./{file}\" target="_blank"><img src="{file}"></a></center><br/>')
+                        f.write(f'    <center><img src="{file}"></center><br/>')
                     
                 except:
                     pass
@@ -1790,7 +1732,8 @@ def doReport(splitPlots, services, outfile, channels, network, startDate, endDat
             try:
                 files = pdfDictionary[f'{channel}_all']
                 for file in files:
-                    f.write(f'    <center><a href=\"./{file}\" target="_blank"><img src="{file}"></a></center><br/>')
+#                     f.write(f'    <center><a href=\"./{file}\" target="_blank"><img src="{file}"></a></center><br/>')
+                    f.write(f'    <center><img src="{file}"></center><br/>')
             except:
                 pass
             f.write('  </div>')
@@ -1804,10 +1747,7 @@ def doReport(splitPlots, services, outfile, channels, network, startDate, endDat
         
         
         #### ADD SPECTROGRAMS
-#         f.write('<br/>')
         f.write('<div class="div-light">')
-#         f.write('<div class="div-dark">')
-#         f.write('<hr style="width:100%;color:lightgray">')
         f.write("<br/>");
         f.write("<a name='spectrograms'></a> <h2>Spectrogram Plots</h2>")
         
@@ -1828,7 +1768,8 @@ def doReport(splitPlots, services, outfile, channels, network, startDate, endDat
             
             spectLink = f'http://service.iris.edu/mustang/noise-pdf-browser/1/spectrogram?' \
                         f'network={network}&channel={channel[0:2]}?&' \
-                        f'starttime={startDate}&endtime={endDate}'
+                        f'starttime={startDate}&endtime={endDate}&color.palette={spectColorPalette}&powerrange={",".join([str(int) for int in powerRanges[channel[0:2]]])}'
+                        
             f.write(f"<h3>{channel[0:2]} channels - <a href='{spectLink}' target='_blank' >Spectrogram Browser</a></h3>")
             if splitPlots == 1: 
                 f.write(f"<b><center>Selected from the {nTop} stations with the highest availability</center></b><br/>")
@@ -1843,7 +1784,8 @@ def doReport(splitPlots, services, outfile, channels, network, startDate, endDat
             try:
                 files = spectDictionary[f'{channel}_smallest']
                 for file in files:
-                    f.write(f'    <center><a href=\"./{file}\" target="_blank"><img src="{file}"></a></center><br/>')
+#                     f.write(f'    <center><a href=\"./{file}\" target="_blank"><img src="{file}"></a></center><br/>')
+                    f.write(f'    <center><img src="{file}"></center><br/>')
             except:
                 pass
             f.write('  </div>')
@@ -1856,13 +1798,13 @@ def doReport(splitPlots, services, outfile, channels, network, startDate, endDat
                 try:
                     files = spectDictionary[f'{channel}_greatest']
                     for file in files:
-                        f.write(f'    <center><a href=\"./{file}\" target="_blank"><img src="{file}"></a></center><br/>')
+#                         f.write(f'    <center><a href=\"./{file}\" target="_blank"><img src="{file}"></a></center><br/>')
+                        f.write(f'    <center><img src="{file}"></center><br/>')
                 except:
                     pass
             
                 f.write('  </div>')
             f.write('</div>')
-#         f.write('<hr style="width:100%;color:lightgray">')
         f.write('<p style="text-align:center"><a href="#top">Back to Top</a></p>')
         f.write('</div>')
 
@@ -1873,8 +1815,6 @@ def doReport(splitPlots, services, outfile, channels, network, startDate, endDat
         #### ADD MAP
         f.write('<div class="div-dark">')
         f.write('<hr style="width:100%;color:lightgray">')
-#         f.write('<hr style="width:100%;color:lightgray">')
-#         f.write('<div class="div-light">')
         f.write("<br/>");
         f.write("<a name='map'></a> <h2>Map</h2>")
         
@@ -1887,8 +1827,8 @@ def doReport(splitPlots, services, outfile, channels, network, startDate, endDat
         elif mapformat == 'pdf':
             f.write(f'    <center><embed src="{mapFilename}.{mapformat}" width="800px" height="600px" /></center><br/>')
         else:
-#              mapformat == 'png':
-            f.write(f'    <center><a href=\"./{mapFilename}.{mapformat}\" target="_blank"><img src="{mapFilename}.{mapformat}"></a></center><br/>')
+#             f.write(f'    <center><a href=\"./{mapFilename}.{mapformat}\" target="_blank"><img src="{mapFilename}.{mapformat}"></a></center><br/>')
+            f.write(f'    <center><img src="{mapFilename}.{mapformat}"></center><br/>')
         
         f.write('<br/>')
         f.write('<hr style="width:100%;color:lightgray">')
@@ -1902,8 +1842,6 @@ def doReport(splitPlots, services, outfile, channels, network, startDate, endDat
         ## ADD STATION TABLE
         f.write('<br/>')
         f.write('<div class="div-light">')
-#         f.write('<div class="div-dark">')
-#         f.write('<hr style="width:100%;color:lightgray">')
         f.write("<br/>");
         f.write("<a name='stations'></a> <h2>Station List</h2>")
         f.write(stationIntroText)
@@ -1925,7 +1863,6 @@ def doReport(splitPlots, services, outfile, channels, network, startDate, endDat
             
         f.write('</table>')
         
-#         f.write('<hr style="width:100%;color:lightgray">')
         f.write('<p style="text-align:center"><a href="#top">Back to Top</a></p>')
         f.write('</div>')
         
@@ -1946,37 +1883,8 @@ def doZip(outdir, outfile):
 
 
 def main():
-    
-    helpText = '''
-    PIQQA USAGE:  python PIQQA.py --network=NET --start=YYYY-mm-dd --end=YYYY-mm-dd 
-    
-    Required Fields:
-        --network=: network code
-        --start=: start date, YYYY-mm-dd
-        --end=: end date, YYYY-mm-dd; time defaults to 00:00:00, so to include all of 2020 the end date would be 2021-01-01
-    Optional Fields
-        --station[s]=: comma-separated list of station codes; defaults to "*"
-        --location[s]=: comma-separated list of location codes; defaults to "*"
-        --channel[s]=: comma-sparated list of channel groups (HH, BH); defaults to "*"
-        --metric[s]=: comma-separated list of metrics to run for the boxplots; defaults: sample_rms,ts_num_gaps,ts_num_gaps_total
-        --maxplot=: number of stations to include in the boxplots; defaults to 30
-        --colorpalette=: color palette for spectrograms; defaults to 'RdYlBu'
-            options available at http://service.iris.edu/mustang/noise-spectrogram/1/
-        --includeoutliers=: whether to include outliers in the boxplots, True/False; defaults to False
-        --spectralrange=: power range to use in the PDFs and spectrograms, comma separated values:  min,max; defaults depend on channel type
-        --basemap=: the name of the basemap to be used for the map; defaults to 'stamen-terrain'
-        --mapformat=: format of the map image, option provided primarily to facilitate converting the report to PDF: html, png, jpeg, svg, pdf; defaults to 'html'
-    If PIQQA is not working as expected, ensure that the conda environment is activated
-    '''
-        
-
-    if (len(sys.argv) == 1) or (sys.argv[1] == '--h') or (sys.argv[1] == '-h'):
-        quit(helpText)
+###### Default values    
     metricList = ['sample_rms','ts_num_gaps','ts_num_gaps_total']
-    metricsRequired = []    # requiring percent_availability is obsolete, but leaving this as an option in case something changes in teh future. 
-    
-    
-    ###### Default values
     stations = "*"
     locations = "*"
     channels = "*"
@@ -2002,8 +1910,35 @@ def main():
                    'DP' : [-200,-60],
                    'GP' : [-200,-60]}
     
+    helpText = f'''
+    PIQQA USAGE:  python PIQQA.py --network=NET --start=YYYY-mm-dd --end=YYYY-mm-dd 
+    
+    Required Fields:
+        --network=: network code
+        --start=: start date, YYYY-mm-dd
+        --end=: end date, YYYY-mm-dd; time defaults to 00:00:00, so to include all of 2020 the end date would be 2021-01-01
+    Optional Fields
+        --station[s]=: comma-separated list of station codes; defaults to "{stations}"
+        --location[s]=: comma-separated list of location codes; defaults to "{locations}"
+        --channel[s]=: comma-sparated list of channel groups (HH, BH); defaults to "{channels}"
+        --metric[s]=: comma-separated list of metrics to run for the boxplots; defaults: {','.join(metricList)}
+        --maxplot=: number of stations to include in the boxplots; defaults to {nBoxPlotSta}
+        --colorpalette=: color palette for spectrograms; defaults to '{spectColorPalette}'
+            options available at http://service.iris.edu/mustang/noise-spectrogram/1/
+        --includeoutliers=: whether to include outliers in the boxplots, True/False; defaults to {includeOutliers}
+        --spectralrange=: power range to use in the PDFs and spectrograms, comma separated values:  min,max; defaults depend on channel type
+        --basemap=: the name of the basemap to be used for the map; defaults to '{basemap}'
+        --mapformat=: format of the map image, option provided primarily to facilitate converting the report to PDF: html, png, jpeg, svg, pdf; defaults to '{mapformat}'
+    If PIQQA is not working as expected, ensure that the conda environment is activated
+    '''
+        
+
+    if (len(sys.argv) == 1) or (sys.argv[1] == '--h') or (sys.argv[1] == '-h'):
+        quit(helpText)
+
+    
+    metricsRequired = []    # requiring percent_availability is obsolete, but leaving this as an option in case something changes in teh future. 
     boxplotExampleImage = './boxplot_example.png'
-    ######
     
     ####### Overwrite defaults with values from the command line
     unknownArgs = list()
@@ -2154,7 +2089,7 @@ def main():
     metadataDF = doMap(network, stations, locations, channels, startDate, endDate, basemap, mapFilename, mapformat)
     
     # Create the Report
-    doReport( splitPlots, services, outfile, channels, network, startDate, endDate, tolerance, nTop, nBottom, metricList, startYear, endYear, actualChannels, avFilesDictionary, boxPlotExampleImage_moved, boxPlotDictionary, stations, locations, pdfDictionary, spectDictionary, mapFilename, metadataDF, availabilityType, metricsWithPlots, mapformat,includeOutliers)
+    doReport( splitPlots, services, outfile, channels, network, startDate, endDate, tolerance, nTop, nBottom, metricList, startYear, endYear, actualChannels, avFilesDictionary, boxPlotExampleImage_moved, boxPlotDictionary, stations, locations, pdfDictionary, spectDictionary, mapFilename, metadataDF, availabilityType, metricsWithPlots, mapformat,includeOutliers, spectColorPalette, powerRanges)
     
     # Zip the report 
     doZip(outdir, outfile)
