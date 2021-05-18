@@ -21,6 +21,7 @@ import sys
 import os
 import numpy as np
 import shutil
+import math
 
 
 def checkAvailability(thisNetwork, thisStation, thisLocation, thisChannel, thisStart, thisEnd):
@@ -647,20 +648,36 @@ def doBoxPlots(splitPlots, metricList, metricsRequired, network, stations, locat
                                 dftmp = df2.iloc[:, nsta-nBottom:nsta]
                             elif ax == ax2:
                                 dftmp = df2.iloc[:, 0:nTop]
-                                
+                            
+                            allLines = list    
                             if includeOutliers:
-                                boxplot = dftmp.boxplot( ax=ax, vert=False, grid=False, color={'medians': 'black', 'boxes':'black', 'whiskers':'black'})
-                                
+                                boxplot, lines = dftmp.boxplot( ax=ax, vert=False, grid=False, color={'medians': 'black', 'boxes':'black', 'whiskers':'black'}, return_type='both')
+                                allLines.append(lines)
                             else:
-                                boxplot = dftmp.boxplot( ax=ax, vert=False, grid=False, showfliers=False, color={'medians': 'black', 'boxes':'black', 'whiskers':'black'})
+                                boxplot, lines = dftmp.boxplot( ax=ax, vert=False, grid=False, showfliers=False, color={'medians': 'black', 'boxes':'black', 'whiskers':'black'}, return_type='both')
+                        
                         ax1.set_title(f'{metric}\n{plotOrder}')
                         ax2.set_xlabel(reportUtils.getMetricLabel(metric))
                         
-
+                        
                         try: 
-                            valueRatio = max(meds) / min(meds)
-                            valueRange = max(meds) - min(meds)
+                            ## if all medians are the same, then adjust the x-axis to a minimum extent
+                            medians = [m.get_xdata()[0] for m in allLines['medians']]
+                            valueRange = max(medians) - min(medians)
                             
+                            if valueRange == 0:
+                                left, right = plt.xlim()
+                                xspan = right - left
+                                medValue = meds.mean()
+                                medMagnitude = math.floor(math.log(medValue, 10))
+                                calcMin = medValue - 1**medMagnitude
+                                calcMax = medValue + 1**medMagnitude
+                                
+                                if xspan < (calcMax - calcMin):
+                                    plt.xlim(left=calcMin, right=calcMax)
+                            
+                            ## if the x-axis range is laarge enough, then force it into log scale
+                            valueRatio = max(meds) / min(meds)
                             if (valueRatio > 50 ) and not (min(dftmp.min()) <= 0):
                                 try:
                                     ax1.set_xscale("log")
@@ -677,18 +694,34 @@ def doBoxPlots(splitPlots, metricList, metricsRequired, network, stations, locat
                     else:
                         # Create and save the boxplot for that metric
                         if includeOutliers:
-                            boxplot = df2.boxplot(vert=False, grid=False, figsize=(width, height), color={'medians': 'black', 'boxes':'black', 'whiskers':'black'})
+                            boxplot, lines = df2.boxplot(vert=False, grid=False, figsize=(width, height), color={'medians': 'black', 'boxes':'black', 'whiskers':'black'}, return_type='both')
                         else:
-                            boxplot = df2.boxplot(vert=False, grid=False, figsize=(width,height), showfliers=False, color={'medians': 'black', 'boxes':'black', 'whiskers':'black'})
+                            boxplot, lines = df2.boxplot(vert=False, grid=False, figsize=(width,height), showfliers=False, color={'medians': 'black', 'boxes':'black', 'whiskers':'black'}, return_type='both')
         
-                    
+                                        
                         boxplot.set_title(f'{metric}\n{plotOrder}')
                         boxplot.set_xlabel(reportUtils.getMetricLabel(metric))
                         
                         try: 
-                            valueRatio = max(meds) / min(meds)
-                            valueRange = max(meds) - min(meds)
+                            ## if all medians are the same, then adjust the x-axis to a minimum extent
+                            medians = [m.get_xdata()[0] for m in lines['medians']]
+                            valueRange = max(medians) - min(medians)
+                            if valueRange == 0:
+                                left, right = plt.xlim()
+                                xspan = right - left
+                                medValue = sum(medians)/len(medians)
+                                if medValue == 0:
+                                    medMagnitude = 0
+                                else:
+                                    medMagnitude = math.floor(math.log(medValue, 10))
+                                calcMin = medValue - 1**medMagnitude
+                                calcMax = medValue + 1**medMagnitude
+                                
+                                if xspan < (calcMax - calcMin):
+                                    plt.xlim(left=calcMin, right=calcMax)
                             
+                            ## if the x-axis range is laarge enough, then force it into log scale
+                            valueRatio = max(meds) / min(meds)
                             if (valueRatio > 50 ) and not (min(df2.min()) <= 0):
                                 boxplot.set_xscale("log")
                             else:
