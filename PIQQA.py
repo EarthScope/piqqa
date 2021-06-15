@@ -649,12 +649,13 @@ def doBoxPlots(splitPlots, metricList, metricsRequired, network, stations, locat
                             elif ax == ax2:
                                 dftmp = df2.iloc[:, 0:nTop]
                             
-                            allLines = list    
+                            allLines = list()    
                             if includeOutliers:
                                 boxplot, lines = dftmp.boxplot( ax=ax, vert=False, grid=False, color={'medians': 'black', 'boxes':'black', 'whiskers':'black'}, return_type='both')
                                 allLines.append(lines)
                             else:
                                 boxplot, lines = dftmp.boxplot( ax=ax, vert=False, grid=False, showfliers=False, color={'medians': 'black', 'boxes':'black', 'whiskers':'black'}, return_type='both')
+                                allLines.append(lines)
                         
                         ax1.set_title(f'{metric}\n{plotOrder}')
                         ax2.set_xlabel(reportUtils.getMetricLabel(metric))

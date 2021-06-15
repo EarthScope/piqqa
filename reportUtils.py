@@ -161,11 +161,12 @@ def addMetricToDF(metric, DF, network, stations, locations, channels, startDate,
           f"sta={','.join(stations)}&loc={','.join(locations)}&chan={','.join(chanList)}" \
           f'&format=text&timewindow={startDate},{endDate}&nodata=404'
     
-    # temporary
-    if ('ts_' in metric):
-        URL = f"http://mustangappbeta01.iris.washington.edu:8080/mustang/measurements/1/query?metric={metric}&net={network}&" \
-              f"sta={','.join(stations)}&loc={','.join(locations)}&chan={','.join(chanList)}" \
-              f'&format=text&timewindow={startDate},{endDate}&nodata=404'
+#     # temporary
+#     if ('ts_' in metric):
+#         URL = f"http://mustangappbeta01.iris.washington.edu:8080/mustang/measurements/1/query?metric={metric}&net={network}&" \
+#               f"sta={','.join(stations)}&loc={','.join(locations)}&chan={','.join(chanList)}" \
+#               f'&format=text&timewindow={startDate},{endDate}&nodata=404'
+    
     try:
         tempDF = retrieveMetrics(URL, metric)
     except Exception as e:
