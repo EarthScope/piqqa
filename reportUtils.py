@@ -201,7 +201,8 @@ def getMetadata(network, stations, locations, channels, startDate, endDate, leve
         stationDF = pd.DataFrame()
     if level == 'station':
         stationDF = pd.DataFrame(columns=['#Network', 'Station', 'Latitude' , 'Longitude' , 'Elevation' , 'SiteName' , 'StartTime' , 'EndTime'])
-
+    if level == 'network':
+        stationDF = pd.DataFrame(columns=['#Network',])
      
     chanList = list()
     for chan in channels.split(','):
@@ -262,12 +263,12 @@ def getMetadata(network, stations, locations, channels, startDate, endDate, leve
                     except Exception as e:
                         print(f"    ERROR: Unable to retrieve channel information from {stationURL}")
                 
-                elif level == 'station': 
+                elif level == 'station' or level == 'network': 
                     try:
                         tmpDF = pd.read_csv(stationURL, sep='|')
                         tmpDF.rename(columns=lambda x: x.strip(), inplace=True)
                     except:
-                        print(f"        ERROR: Unable to retrieve channel information from {stationURL}")
+                        print(f"        ERROR: Unable to retrieve metadata information from {stationURL}")
 
             except:
                 tmpDF = pd.DataFrame()
