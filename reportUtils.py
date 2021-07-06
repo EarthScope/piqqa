@@ -4,6 +4,7 @@ Created on Aug 18, 2020
 @author: laura
 '''
 
+
 import requests
 from io import StringIO
 import pandas as pd

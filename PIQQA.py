@@ -6,8 +6,7 @@ Created on Aug 18, 2020
 @author: laura
 '''
 
-# version = 'v1.0'
-version = 'v. 0.9.1'
+version = 'v1.0'
 
 import reportUtils
 import pandas as pd
