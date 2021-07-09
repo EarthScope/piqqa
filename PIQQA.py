@@ -591,7 +591,7 @@ def doBoxPlots(splitPlots, metricList, metricsRequired, network, stations, locat
                     affectedRows = scaledDF.index[((scaledDF['target']==thisTarget) & (scaledDF['start'] < thisEnd) & (scaledDF['end'] > thisStart))].tolist()
                     scaledDF.loc[affectedRows, 'scale_corrected_sample_rms'] = scaledDF['sample_rms_orig'][affectedRows] / thisScale
             except:
-                quit("\nQUITTING: Unable to apply scale factor to sample_rms values; will not be able to select PDFs or Spectrograms\n          Do metrics exist for this network? Does is have data for channels that we run MUSTANG metrics on?")
+                quit("\nQUITTING: Unable to apply scale factor to sample_rms values; will not be able to select PDFs or Spectrograms\n          Do metrics exist for this network? Does it have data for channels that we run MUSTANG metrics on?")
         
             
         boxPlotDictionary = {}
