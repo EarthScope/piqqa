@@ -118,7 +118,7 @@ Running PIQQA.py without any arguments, or with the -h/--h flags, will produce s
         --stations=: comma-separated list of station codes; defaults to "*"
         --locations=: comma-separated list of location codes; defaults to "*"
         --channels=: comma-sparated list of channel groups (HH, BH); defaults to "*"
-        --metrics=: comma-separated list of metrics to run for the boxplots; defaults: ts_channel_continuity,sample_rms,num_gaps
+        --metrics=: comma-separated list of metrics to run for the boxplots; defaults: ts_channel_continuity,sample_rms,ts_num_gaps
         --maxplot=: number of stations to include in the boxplots; defaults to 30
         --colorpalette=: color palette for spectrograms; defaults to 'RdYlBu'
             options available at http://service.iris.edu/mustang/noise-spectrogram/1/
