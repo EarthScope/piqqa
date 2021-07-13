@@ -70,7 +70,7 @@ perform installs, updates, or run PIQQA.
 ```
 cd piqqa
 conda update conda
-conda create --name piqqa -c conda-forge --file piqqa-conda-install.txt
+conda create --name piqqa python=3.9 -c conda-forge --file piqqa-conda-install.txt
 conda activate piqqa
 ```
 
