@@ -522,56 +522,62 @@ def doBoxPlots(splitPlots, metricList, metricsRequired, network, stations, locat
 
         # Subset the ts_num_gaps to only encompass the days from the first to the last day of data for each target
         if ('ts_num_gaps' in metricDF.columns) or ('ts_num_gaps_total' in metricDF.columns):
-            print("    INFO: Subsetting ts_num_gaps to the data start and end dates for each target")
+            print("    INFO: Subsetting ts_num_gaps metric(s) to the data start and end dates for each target")
                
             ## Get the availability extents for all targets
             extentsDF, service = reportUtils.getAvailability(metricDF.snclq.unique(), startDate, endDate, "", "extents")
+
+            if extentsDF.empty:
+                print("        WARNING: no data extents found")
+            else: 
    
-   
-            ## ts_num_gaps
-            if 'ts_num_gaps' in metricDF.columns:
-                # Create a temporary dataframe that only has the target-days that have availability, fillin it with ts_num_gaps values
-                tmpDF = pd.DataFrame()
-                for idx, row in extentsDF.iterrows():
-                    thisTarget = f"{row['network']}.{row['station']}.{row['location'].replace('--','')}.{row['channel']}"
-                    thisStartTime = row['earliest'].replace(hour=0,minute=0,second=0,microsecond=0, nanosecond=0)
+                ## ts_num_gaps
+                if 'ts_num_gaps' in metricDF.columns:
+                    # Create a temporary dataframe that only has the target-days that have availability, fillin it with ts_num_gaps values
+                    tmpDF = pd.DataFrame()
+                    for idx, row in extentsDF.iterrows():
+                        thisTarget = f"{row['network']}.{row['station']}.{row['location'].replace('--','')}.{row['channel']}"
+                        thisStartTime = row['earliest'].replace(hour=0,minute=0,second=0,microsecond=0, nanosecond=0)
+                           
+                        thisDF = metricDF[(metricDF['target']==str(thisTarget)) & (metricDF['start'] >= thisStartTime.to_datetime64()) & (metricDF['start'] <= row['latest'].to_datetime64())]
+                        if tmpDF.empty:
+                            tmpDF = thisDF.copy()
+                        else:
+                            tmpDF = tmpDF.append(thisDF, ignore_index=True)
                        
-                    thisDF = metricDF[(metricDF['target']==str(thisTarget)) & (metricDF['start'] >= thisStartTime.to_datetime64()) & (metricDF['start'] <= row['latest'].to_datetime64())]
-                    if tmpDF.empty:
-                        tmpDF = thisDF.copy()
-                    else:
-                        tmpDF = tmpDF.append(thisDF, ignore_index=True)
-                   
-                columnsToKeep = ['snclq', 'start', 'end',  'target', 'station', 'ts_num_gaps']
-                columnsToRemove = [c for c in tmpDF.columns if c not in columnsToKeep]
-       
-                tmpDF.drop(columnsToRemove, axis=1, inplace=True)
-                
-                
-                tmpDF.rename(columns = {'ts_num_gaps': 'ts_num_gaps_subset'}, inplace=True)   
-                   
-                metricDF = pd.merge(metricDF, tmpDF, how='outer', on=['target','snclq','station', 'start', 'end'])
-                metricDF.drop('ts_num_gaps', axis=1, inplace=True)
-                metricDF.rename(columns={'ts_num_gaps_subset':'ts_num_gaps'}, inplace=True)
-
-
-            ## ts_num_gaps_total
-            if 'ts_num_gaps_total' in metricDF.columns:
-                ## FILL IN WHAT HAS TO HAPPEN HERE: Remove any targets from metricDF['ts_num_gaps_total'] if it isn't in the availability extents dataframe
-                ## since that means there's no data for that target
-                extentsDF['target'] = extentsDF['network'].str.cat(extentsDF['station'].str.cat(extentsDF['location'].str.cat(extentsDF['channel'],sep="."),sep="."),sep=".").replace('--','', regex=True)
-                availabilityStations = extentsDF.target.unique() 
-                columns = [metricDF['ts_num_gaps_total'], metricDF['start'], metricDF['end'], metricDF['target']]
-                headers = ['ts_num_gaps_total','start','end','target']
-                tmpDF = pd.concat(columns, axis=1, keys=headers)
-
-                
-                # Only station that have availability extents should be included, all others have no data.
-                tmpDF = tmpDF[tmpDF['target'].isin(availabilityStations)]
-                tmpDF.rename(columns = {'ts_num_gaps_total': 'ts_num_gaps_total_subset'}, inplace=True) 
-                metricDF = pd.merge(metricDF, tmpDF, how='outer', on=['target','start', 'end'])
-                metricDF.drop('ts_num_gaps_total', axis=1, inplace=True)
-                metricDF.rename(columns={'ts_num_gaps_total_subset':'ts_num_gaps_total'}, inplace=True)
+                    columnsToKeep = ['snclq', 'start', 'end',  'target', 'station', 'ts_num_gaps']
+                    columnsToRemove = [c for c in tmpDF.columns if c not in columnsToKeep]
+           
+                    tmpDF.drop(columnsToRemove, axis=1, inplace=True)
+                    
+                    
+                    tmpDF.rename(columns = {'ts_num_gaps': 'ts_num_gaps_subset'}, inplace=True)   
+                    
+                    try:   
+                        metricDF = pd.merge(metricDF, tmpDF, how='outer', on=['target','snclq','station', 'start', 'end'])
+                        metricDF.drop('ts_num_gaps', axis=1, inplace=True)
+                        metricDF.rename(columns={'ts_num_gaps_subset':'ts_num_gaps'}, inplace=True)
+                    except:
+                        pass
+    
+    
+                ## ts_num_gaps_total
+                if 'ts_num_gaps_total' in metricDF.columns:
+                    ## FILL IN WHAT HAS TO HAPPEN HERE: Remove any targets from metricDF['ts_num_gaps_total'] if it isn't in the availability extents dataframe
+                    ## since that means there's no data for that target
+                    extentsDF['target'] = extentsDF['network'].str.cat(extentsDF['station'].str.cat(extentsDF['location'].str.cat(extentsDF['channel'],sep="."),sep="."),sep=".").replace('--','', regex=True)
+                    availabilityStations = extentsDF.target.unique() 
+                    columns = [metricDF['ts_num_gaps_total'], metricDF['start'], metricDF['end'], metricDF['target']]
+                    headers = ['ts_num_gaps_total','start','end','target']
+                    tmpDF = pd.concat(columns, axis=1, keys=headers)
+    
+                    
+                    # Only station that have availability extents should be included, all others have no data.
+                    tmpDF = tmpDF[tmpDF['target'].isin(availabilityStations)]
+                    tmpDF.rename(columns = {'ts_num_gaps_total': 'ts_num_gaps_total_subset'}, inplace=True) 
+                    metricDF = pd.merge(metricDF, tmpDF, how='outer', on=['target','start', 'end'])
+                    metricDF.drop('ts_num_gaps_total', axis=1, inplace=True)
+                    metricDF.rename(columns={'ts_num_gaps_total_subset':'ts_num_gaps_total'}, inplace=True)
 
         scaledDF= metricDF.copy()   
         # scale sample_rms by "scale" from station ws
@@ -591,7 +597,7 @@ def doBoxPlots(splitPlots, metricList, metricsRequired, network, stations, locat
                     affectedRows = scaledDF.index[((scaledDF['target']==thisTarget) & (scaledDF['start'] < thisEnd) & (scaledDF['end'] > thisStart))].tolist()
                     scaledDF.loc[affectedRows, 'scale_corrected_sample_rms'] = scaledDF['sample_rms_orig'][affectedRows] / thisScale
             except:
-                quit("\nQUITTING: Unable to apply scale factor to sample_rms values; will not be able to select PDFs or Spectrograms\n          Do metrics exist for this network? Does it have data for channels that we run MUSTANG metrics on?")
+                quit("\nQUITTING: Unable to apply scale factor to sample_rms values; will not be able to select PDFs or Spectrograms\n          Do metrics exist for this network? Does is have data for channels that we run MUSTANG metrics on? Is the MUSTANG metric request too large (>1000000 station-channel-days)?")
         
             
         boxPlotDictionary = {}
@@ -1147,7 +1153,7 @@ def doMap(network, stations, locations, channels, startDate, endDate, basemap, m
     
 ## Write to HTML file
 
-def doReport(splitPlots, services, outfile, channels, network, startDate, endDate, tolerance, nTop, nBottom, metricList, startYear, endYear, actualChannels, avFilesDictionary, boxPlotExampleImage_moved, boxPlotDictionary, stations, locations, pdfDictionary, spectDictionary, mapFilename, metadataDF, availabilityType, metricsWithPlots, mapformat, includeOutliers, spectColorPalette, powerRanges):
+def doReport(splitPlots, services, outfile, channels, network, startDate, endDate, tolerance, nTop, nBottom, metricList, startYear, endYear, actualChannels, avFilesDictionary, boxPlotExampleImage_moved, boxPlotDictionary, stations, locations, pdfDictionary, spectDictionary, mapFilename, metadataDF, availabilityType, metricsWithPlots, mapformat, includeOutliers, spectColorPalette, powerRanges, userDefinedPowerRange):
     print(f"INFO: Writing to file {outfile}")
     
     
@@ -1815,9 +1821,18 @@ def doReport(splitPlots, services, outfile, channels, network, startDate, endDat
                 # Then there is only 1 file, only 1 station selected. 
                 nStations = 1
             
+            
+            if not userDefinedPowerRange:
+                try:
+                    spectPowerRange = ",".join([str(int) for int in powerRanges[channel[0:2]]])
+                except:
+                    spectPowerRange = "-200,-20"
+            else:
+                spectPowerRange = ",".join([str(int) for int in userDefinedPowerRange])
+            
             spectLink = f'http://service.iris.edu/mustang/noise-pdf-browser/1/spectrogram?' \
                         f'network={network}&channel={channel[0:2]}?&' \
-                        f'starttime={startDate}&endtime={endDate}&color.palette={spectColorPalette}&powerrange={",".join([str(int) for int in powerRanges[channel[0:2]]])}'
+                        f'starttime={startDate}&endtime={endDate}&color.palette={spectColorPalette}&powerrange={spectPowerRange}'
                         
             f.write(f"<h3>{channel[0:2]} channels - <a href='{spectLink}' target='_blank' >Spectrogram Browser</a></h3>")
             if splitPlots == 1: 
@@ -2138,7 +2153,7 @@ def main():
     metadataDF = doMap(network, stations, locations, channels, startDate, endDate, basemap, mapFilename, mapformat)
     
     # Create the Report
-    doReport( splitPlots, services, outfile, channels, network, startDate, endDate, tolerance, nTop, nBottom, metricList, startYear, endYear, actualChannels, avFilesDictionary, boxPlotExampleImage_moved, boxPlotDictionary, stations, locations, pdfDictionary, spectDictionary, mapFilename, metadataDF, availabilityType, metricsWithPlots, mapformat,includeOutliers, spectColorPalette, powerRanges)
+    doReport( splitPlots, services, outfile, channels, network, startDate, endDate, tolerance, nTop, nBottom, metricList, startYear, endYear, actualChannels, avFilesDictionary, boxPlotExampleImage_moved, boxPlotDictionary, stations, locations, pdfDictionary, spectDictionary, mapFilename, metadataDF, availabilityType, metricsWithPlots, mapformat,includeOutliers, spectColorPalette, powerRanges, userDefinedPowerRange)
     
     # Zip the report 
     doZip(outdir, outfile)
