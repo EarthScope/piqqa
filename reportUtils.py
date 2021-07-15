@@ -1,8 +1,7 @@
 '''
-Created on Aug 18, 2020
-
-@author: Quality Assurance Team, IRIS Data Management Center
-
+:copyright:
+    Copyright 2021 Quality Assurance Team, IRIS Data Management Center
+    
 :license:    
     Licensed to the Apache Software Foundation (ASF) under one
 or more contributor license agreements.  See the NOTICE file
