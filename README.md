@@ -1,5 +1,5 @@
 # PIQQA
-The PI's Quick Quality Assessment
+The PI's Quick Quality Assessment   
 
 PIQQA is python utility to create a simple Quality Assurance report. Developed by the IRIS DMC, this tool is intended for use by the PASSCAL Instrument Center, meant to generate an easy-to-digest QA report for PIs after their experiment wraps.
 
@@ -10,6 +10,7 @@ The final report has 5 sections: Boxplots, PDFs, Spectrograms, Map, and Stations
 Boxplots, PDFs, and Spectrograms are displayed for each channel groups (for example, DP or BH) included in the report.
 
 PDFs and Spectrograms are displayed for the stations with the smallest and greatest scaled sample_rms values, and PDFs are also displayed for a composite of all stations within that channel group. 
+
 
 ## Installation
 
@@ -160,7 +161,23 @@ In addition to those fields, there are a number of optional fields.
 ```
 `basemap` specifies the basemap to be used in the Map section. Current options include: "open-street-map", "carto-positron", "carto-darkmatter", "stamen-terrain", "stamen-toner" or "stamen-watercolor".
 
+## License
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
 
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License. 
 
 
 
