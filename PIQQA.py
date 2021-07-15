@@ -2,7 +2,7 @@
 
 '''
 :copyright:
-    Copyright 2021 Laura Keyson, IRIS Data Management Center
+    Copyright (C) 2021 Laura Keyson, IRIS Data Management Center
 
 :license:    
     Licensed to the Apache Software Foundation (ASF) under one
