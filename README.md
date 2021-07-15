@@ -145,7 +145,7 @@ In addition to those fields, there are a number of optional fields.
 
 `stations`, `locations`, and `channels` are all ways to narrow down the report by limiting the targets included.  `channels` should be a two-letter code, or list of two-letter codes, such as DP, BH.
 
-`metrics` can be used to limit or expand the metrics included in the report. No matter what, percent_availability and sample_rms will always be included in the metric list, as they are special metrics used throughout the report.
+`metrics` can be used to limit or expand the metrics included in the report. No matter what, ts_percent_availability and sample_rms will always be included in the metric list, as they are special metrics used throughout the report.
 
 `maxplot` is how you can limit the number of stations displayed in the boxplots.
 
