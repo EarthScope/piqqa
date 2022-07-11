@@ -3,4 +3,3 @@ numpy=1.21.0
 requests= 2.25.1
 matplotlib= 3.4.2
 plotly=5.1.0
-python-kaleido=0.2.1
