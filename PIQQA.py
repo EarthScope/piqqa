@@ -24,7 +24,7 @@ under the License.
 
 '''
 
-version = 'v1.0.0'
+version = 'v1.0.1'
 
 import reportUtils
 import pandas as pd
@@ -42,8 +42,7 @@ import math
 
 
 def checkAvailability(thisNetwork, thisStation, thisLocation, thisChannel, thisStart, thisEnd):
-        
-        thisAvDF = reportUtils.addMetricToDF('ts_percent_availability_total', pd.DataFrame(), thisNetwork, [thisStation], [thisLocation], thisChannel, thisStart, thisEnd)
+        thisAvDF = reportUtils.addMetricToDF('ts_percent_availability_total', pd.DataFrame(), thisNetwork, thisStation, thisLocation, thisChannel, thisStart, thisEnd)
 
         if thisAvDF.empty:
 #             print(f"         INFO: unable to retrieve values for ts_percent_availability_total, trying percent_availability")
@@ -52,7 +51,7 @@ def checkAvailability(thisNetwork, thisStation, thisLocation, thisChannel, thisS
             thisStart = thisStart.split('T')[0]
             thisEnd = (datetime.datetime.strptime(thisEnd, '%Y-%m-%dT%H:%M:%S') + datetime.timedelta(days=1)).strftime('%Y-%m-%d')
 
-            thisAvDF = reportUtils.addMetricToDF('percent_availability', pd.DataFrame(), thisNetwork, [thisStation], [thisLocation], thisChannel, thisStart, thisEnd)
+            thisAvDF = reportUtils.addMetricToDF('percent_availability', pd.DataFrame(), thisNetwork, thisStation, thisLocation, thisChannel, thisStart, thisEnd)
           
             if thisAvDF.empty:
                 print(f'         WARNING: Unable to retrieve values for requested channels, bypassing')
