@@ -301,17 +301,17 @@ def getMetadata(network, stations, locations, channels, startDate, endDate, leve
      
     return stationDF
 
-def retrieveExpectedPDFs(NSCL, startDate, endDate):
-    net = NSCL.split('.')[0]
-    sta = NSCL.split('.')[1]
-    loc = NSCL.split('.')[2]
-    cha = f"{NSCL.split('.')[3]}?"
+def retrieveExpectedPDFs(NSLC, startDate, endDate):
+    net = NSLC.split('.')[0]
+    sta = NSLC.split('.')[1]
+    loc = NSLC.split('.')[2]
+    cha = f"{NSLC.split('.')[3]}?"
     URL = f'http://service.iris.edu/mustang/noise-pdf-browser/1/availability?network={net}&station={sta}&location={loc}&channel={cha}&starttime={startDate}&endtime={endDate}&interval=all'
 
     response =  requests.get(URL) 
     if response.text.startswith("Error"):
         # Wait 5 seconds and try again
-        print(f"        --> Error retrieving list of expected PDFs for {NSCL}, waiting 5 seconds and trying again")
+        print(f"        --> Error retrieving list of expected PDFs for {NSLC}, waiting 5 seconds and trying again")
         time.sleep(5)
         response =  requests.get(URL) 
         if response.text.startswith("Error"):
