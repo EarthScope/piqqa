@@ -28,10 +28,7 @@ from io import StringIO
 import pandas as pd
 import numpy as np
 import time
-# from matplotlib.contour import ClabelText
 import urllib
-import re
-
 
 
 def getAvailability(snclqs, startDate, endDate, tolerance, avtype):
@@ -174,12 +171,6 @@ def addMetricToDF(metric, DF, network, stations, locations, channels, startDate,
         elif chan == "*":
             chan = "??Z"
         chanList.append(chan)
-    
-    # At different times, the sup
-#     if type(stations) == list:
-#         stations = ','.join(stations)
-#     if type(locations) == list:
-#         locations = ','.join(locations)
 
     URL = f"http://service.iris.edu/mustang/measurements/1/query?metric={metric}&net={network}&" \
           f"sta={stations}&loc={locations}&chan={','.join(chanList)}" \

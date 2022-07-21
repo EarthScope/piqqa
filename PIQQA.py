@@ -44,9 +44,7 @@ import math
 def checkAvailability(thisNetwork, thisStation, thisLocation, thisChannel, thisStart, thisEnd):
         thisAvDF = reportUtils.addMetricToDF('ts_percent_availability_total', pd.DataFrame(), thisNetwork, thisStation, thisLocation, thisChannel, thisStart, thisEnd)
 
-        if thisAvDF.empty:
-#             print(f"         INFO: unable to retrieve values for ts_percent_availability_total, trying percent_availability")
-            
+        if thisAvDF.empty:            
             # need to round out the start and end times for non-ts_percent_availability_total, in case it's very short
             thisStart = thisStart.split('T')[0]
             thisEnd = (datetime.datetime.strptime(thisEnd, '%Y-%m-%dT%H:%M:%S') + datetime.timedelta(days=1)).strftime('%Y-%m-%d')
@@ -269,9 +267,7 @@ def doAvailability(splitPlots, startDate, endDate, network, stations, locations,
 
             ax1.set_xlim([mpl.dates.datestr2num(startDate), mpl.dates.datestr2num(endDate)] )
             ax1.xaxis.grid(True, which='both', color='k', linestyle=':')    
-                
-                
-                
+                                
                 
             ## And again, for the bottom stations
             bottomStationsAvDF, services = reportUtils.getAvailability(bottomStations['snclq'], startDate, endDate, tolerance,'')
@@ -580,7 +576,7 @@ def doBoxPlots(splitPlots, metricList, metricsRequired, network, stations, locat
     
                 ## ts_num_gaps_total
                 if 'ts_num_gaps_total' in metricDF.columns:
-                    ## FILL IN WHAT HAS TO HAPPEN HERE: Remove any targets from metricDF['ts_num_gaps_total'] if it isn't in the availability extents dataframe
+                    ## Remove any targets from metricDF['ts_num_gaps_total'] if it isn't in the availability extents dataframe
                     ## since that means there's no data for that target
                     extentsDF['target'] = extentsDF['network'].str.cat(extentsDF['station'].str.cat(extentsDF['location'].str.cat(extentsDF['channel'],sep="."),sep="."),sep=".").replace('--','', regex=True)
                     availabilityStations = extentsDF.target.unique() 
@@ -633,7 +629,6 @@ def doBoxPlots(splitPlots, metricList, metricsRequired, network, stations, locat
                 
                 try:
                     # This may fail if the metric wasn't accessible from web services
-                    
                     # Sort by the median value
                     df2 = pd.DataFrame({col:vals[metric] for col,vals in grouped})
                     if df2.isnull().values.all():
@@ -1187,10 +1182,8 @@ def doReport(splitPlots, services, outfile, channels, network, startDate, endDat
     chans = []
     for chan in channels.split(','):
         if len(chan) == 2:
-#             chan = f'{chan}Z,{chan}1'
             chan = f'{chan}Z'
         if chan == "*":
-#             chan = "??Z,??1"
             chan = "??Z"
         chans.append(chan)
 
@@ -1660,7 +1653,6 @@ def doReport(splitPlots, services, outfile, channels, network, startDate, endDat
             f.write(f"<h3>{channel[0:2]} channels</h3>")
             f.write("<p></p>");
             f.write('<div class="row">')
-#             f.write(f'    <center><a href=\"{file}\" target="_blank"><img src="{file}" width="100%"></a></center><br/>')
             f.write(f'    <center><img src="{file}" width="100%"></center><br/>')
 
             f.write('</div>')
@@ -1687,7 +1679,6 @@ def doReport(splitPlots, services, outfile, channels, network, startDate, endDat
         # Add intro, boxplot example plot, and rest of intro
         f.write(boxPlotIntroText)
         f.write(boxPlotIntroText2)
-#         f.write(f'    <center><a href=\"./{boxPlotExampleImage_moved}\" target="_blank"><img src="{boxPlotExampleImage_moved}" width="50%"></a></center><br/>')
         f.write(f'    <center><img src="{boxPlotExampleImage_moved}" width="50%"></center><br/>')
 
         f.write(boxPlotIntroText3)
@@ -1705,7 +1696,6 @@ def doReport(splitPlots, services, outfile, channels, network, startDate, endDat
             files = boxPlotDictionary[f'{channel}']
             for file in files:
                 f.write('  <div class="column">')
-#                 f.write(f'    <center><a href=\"./{file}\" target="_blank"><img src="{file}"></a></center><br/>')
                 f.write(f'    <center><img src="{file}"></center><br/>')
                 f.write('  </div>')
                     
@@ -1782,7 +1772,6 @@ def doReport(splitPlots, services, outfile, channels, network, startDate, endDat
                 files = pdfDictionary[f'{channel}_smallest']
                 
                 for file in files:
-#                     f.write(f'    <center><a href=\"./{file}\" target="_blank"><img src="{file}"></a></center><br/>')
                     f.write(f'    <center><img src="{file}"></center><br/>')
             except:
                 pass
@@ -1796,7 +1785,6 @@ def doReport(splitPlots, services, outfile, channels, network, startDate, endDat
                 try:
                     files = pdfDictionary[f'{channel}_greatest']
                     for file in files:
-#                         f.write(f'    <center><a href=\"./{file}\" target="_blank"><img src="{file}"></a></center><br/>')
                         f.write(f'    <center><img src="{file}"></center><br/>')
                     
                 except:
@@ -1808,7 +1796,6 @@ def doReport(splitPlots, services, outfile, channels, network, startDate, endDat
             try:
                 files = pdfDictionary[f'{channel}_all']
                 for file in files:
-#                     f.write(f'    <center><a href=\"./{file}\" target="_blank"><img src="{file}"></a></center><br/>')
                     f.write(f'    <center><img src="{file}"></center><br/>')
             except:
                 pass
@@ -2065,10 +2052,7 @@ def main():
         print(f"Unrecognized arguments found: {','.join(unknownArgs)}")
         print(f'{helpText}')
         quit("INFO: Exiting PIQQA")       
-    
-    #     if arg.lower().startswith('--ph5'):
-    #         service = 'ph5ws'
-    
+        
     
     ireturn = 0
     try:
