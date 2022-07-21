@@ -24,7 +24,7 @@ under the License.
 
 '''
 
-version = 'v1.0.0'
+version = 'v1.0.1'
 
 import reportUtils
 import pandas as pd

@@ -168,11 +168,11 @@ def addMetricToDF(metric, DF, network, stations, locations, channels, startDate,
         print(f"        Retrieving {metric}")
     chanList = list()
     for chan in channels.split(','):
-        if len(chan) == 2:
-#             chan = f"{chan}Z,{chan}1"
+        if (len(chan) == 3) and (chan[2] in ['*', '?', '.', '_']):
+            chan = f'{chan[0:2]}Z'
+        elif len(chan) == 2:
             chan = f"{chan}Z"
-        if chan == "*":
-#             chan = "??Z,??1"
+        elif chan == "*":
             chan = "??Z"
         chanList.append(chan)
     
@@ -225,10 +225,12 @@ def getMetadata(network, stations, locations, channels, startDate, endDate, leve
      
     chanList = list()
     for chan in channels.split(','):
-        if len(chan) == 2:
+        if (len(chan) == 3) and (chan[2] in ['*', '?', '.', '_']):
+            chan = f'{chan[0:2]}Z'
+        elif len(chan) == 2:
 #             chan = f"{chan}Z,{chan}1"
             chan = f"{chan}Z"
-        if chan == "*":
+        elif chan == "*":
 #             chan = "??Z,??1"
             chan = "??Z"
         chanList.append(chan)
