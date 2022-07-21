@@ -28,10 +28,7 @@ from io import StringIO
 import pandas as pd
 import numpy as np
 import time
-# from matplotlib.contour import ClabelText
 import urllib
-import re
-
 
 
 def getAvailability(snclqs, startDate, endDate, tolerance, avtype):
@@ -95,7 +92,6 @@ def getAvailability(snclqs, startDate, endDate, tolerance, avtype):
               f'net={nets}&sta={stas}&loc={locs}&cha={chans}&quality={qs}&' \
               f'starttime={startDate}&endtime={endDate}&orderby=nslc_time_quality_samplerate&' \
               f'includerestricted=true&nodata=404'    
-#         print("TEMP: URL\n%s" % URL)
         try:
             availabilityDF = pd.read_csv(URL, sep=' ', dtype={'Location': str, 'Station': str}, parse_dates=['Earliest','Latest'])
         except:
@@ -175,16 +171,11 @@ def addMetricToDF(metric, DF, network, stations, locations, channels, startDate,
         elif chan == "*":
             chan = "??Z"
         chanList.append(chan)
-    
+
     URL = f"http://service.iris.edu/mustang/measurements/1/query?metric={metric}&net={network}&" \
-          f"sta={','.join(stations)}&loc={','.join(locations)}&chan={','.join(chanList)}" \
+          f"sta={stations}&loc={locations}&chan={','.join(chanList)}" \
           f'&format=text&timewindow={startDate},{endDate}&nodata=404'
     
-#     # temporary
-#     if ('ts_' in metric):
-#         URL = f"http://mustangappbeta01.iris.washington.edu:8080/mustang/measurements/1/query?metric={metric}&net={network}&" \
-#               f"sta={','.join(stations)}&loc={','.join(locations)}&chan={','.join(chanList)}" \
-#               f'&format=text&timewindow={startDate},{endDate}&nodata=404'
     
     try:
         tempDF = retrieveMetrics(URL, metric)
@@ -301,17 +292,21 @@ def getMetadata(network, stations, locations, channels, startDate, endDate, leve
      
     return stationDF
 
-def retrieveExpectedPDFs(smallestNSLC, startDate, endDate):
-    URL = f'http://service.iris.edu/mustang/noise-pdf-browser/1/availability?target={smallestNSLC}?.*&starttime={startDate}&endtime={endDate}&interval=all'
-#     print(URL)
+def retrieveExpectedPDFs(NSLC, startDate, endDate):
+    net = NSLC.split('.')[0]
+    sta = NSLC.split('.')[1]
+    loc = NSLC.split('.')[2]
+    cha = f"{NSLC.split('.')[3]}?"
+    URL = f'http://service.iris.edu/mustang/noise-pdf-browser/1/availability?network={net}&station={sta}&location={loc}&channel={cha}&starttime={startDate}&endtime={endDate}&interval=all'
+
     response =  requests.get(URL) 
     if response.text.startswith("Error"):
         # Wait 5 seconds and try again
-        print(f"        --> Error retrieving list of expected PDFs for {smallestNSLC}, waiting 5 seconds and trying again")
+        print(f"        --> Error retrieving list of expected PDFs for {NSLC}, waiting 5 seconds and trying again")
         time.sleep(5)
         response =  requests.get(URL) 
         if response.text.startswith("Error"):
-            print(f"        --> Unable to retrieve PDF list for {smallestNSLC}")
+            print(f"        --> Unable to retrieve PDF list for {NSLC}")
 #             print(response.text)
             expectedTargets = list()
         
@@ -322,6 +317,11 @@ def retrieveExpectedPDFs(smallestNSLC, startDate, endDate):
     return expectedTargets
 
 def getPDF(target, startDate, endDate, spectPowerRange, imageDir):
+    net = target.split('.')[0]
+    sta = target.split('.')[1]
+    loc = target.split('.')[2]
+    cha = target.split('.')[3]
+    
     
     plot_titlefont=20
     plot_subtitlefont=18 
@@ -330,7 +330,8 @@ def getPDF(target, startDate, endDate, spectPowerRange, imageDir):
     plotArguments = f"plot.titlefont.size={plot_titlefont}&plot.subtitlefont.size={plot_subtitlefont}" \
                     f"&plot.axisfont.size={plot_axisfont}&plot.labelfont.size={plot_labelfont}"
                     
-    URL = f"http://service.iris.edu/mustang/noise-pdf/1/query?target={target}&" \
+    URL = f"http://service.iris.edu/mustang/noise-pdf/1/query?&" \
+          f"network={net}&station={sta}&location={loc}&channel={cha}&quality=?&" \
           f"starttime={startDate}&endtime={endDate}&format=plot&plot.interpolation=bicubic&nodata=404&" \
           f"plot.power.min={spectPowerRange[0]}&plot.power.max={spectPowerRange[1]}&{plotArguments}"
 
