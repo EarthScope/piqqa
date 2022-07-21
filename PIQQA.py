@@ -1133,6 +1133,7 @@ def doMap(network, stations, locations, channels, startDate, endDate, basemap, m
         print("    INFO: Retrieving metadata")
         metadataDF = reportUtils.getMetadata(network, stations, locations, channels, startDate, endDate, 'station')
         metadataDF['EndTime'].replace(np.nan, '', regex=True, inplace=True)
+        metadataDF['size'] = [1]*len(metadataDF)
         
         # The map doesn't have a good way to bound, but instead 'zoom' - use this to figure out a good zoom level
         latrange = metadataDF['Latitude'].max() - metadataDF['Latitude'].min()
@@ -1145,10 +1146,13 @@ def doMap(network, stations, locations, channels, startDate, endDate, basemap, m
 
         # Create the figure
         print("    INFO: Plotting")
+        markerColor = ['#0047AB']*len(metadataDF)
+
         fig = px.scatter_mapbox(metadataDF, lat="Latitude", lon="Longitude", hover_name="Station", 
-                                hover_data=["Latitude", "Longitude","StartTime","EndTime"],
-                                color_discrete_sequence=["indigo"], zoom=zoom, height=500)
-    
+                                hover_data={"Latitude":True, "Longitude":True,"StartTime":True,"EndTime":True, "size":False},
+                                color_discrete_sequence=markerColor, zoom=zoom, height=500,
+                                size="size", size_max=7)
+
         # Add the basemap
         fig.update_layout(mapbox_style=basemap)
         fig.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
