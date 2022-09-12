@@ -625,14 +625,14 @@ def doBoxPlots(splitPlots, metricList, metricsRequired, network, stations, locat
             tmpDF = scaledDF[scaledDF['target'].str.endswith(channelGroup)]
             grouped = tmpDF.groupby(['station'])
             
-            
             filenames = list()
             for metric in metricList:
+                if metric == 'sample_rms':
+                    metric = "scale_corrected_sample_rms"
                 if metric not in tmpDF.columns:
                     continue
                 fig = plt.Figure(figsize=(3,  0.2*nBoxPlotSta))
-                if metric == 'sample_rms':
-                    metric = "scale_corrected_sample_rms"
+                
                 
                 try:
                     # This may fail if the metric wasn't accessible from web services
