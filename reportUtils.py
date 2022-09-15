@@ -157,6 +157,10 @@ def retrieveMetrics(URL, metric):
     tempDF['start'] = pd.to_datetime(tempDF['start'])
     tempDF['end'] = pd.to_datetime(tempDF['end'])
     
+    if metric == "sample_rms" and tempDF.empty:
+        print(f"             --> Unable to get measurements for {metric}")
+        print(f"             {URL}")
+    
     return tempDF
 
 def addMetricToDF(metric, DF, network, stations, locations, channels, startDate, endDate):
@@ -320,6 +324,8 @@ def getPDF(target, startDate, endDate, spectPowerRange, imageDir):
     net = target.split('.')[0]
     sta = target.split('.')[1]
     loc = target.split('.')[2]
+    if loc == '':
+        loc = '--'
     cha = target.split('.')[3]
     
     
@@ -398,10 +404,16 @@ def getBoundsZoomLevel(bounds, mapDim):
     
         lngDiff = e_long - w_long
         lngFraction = ((lngDiff + 360) if lngDiff < 0 else lngDiff) / 360
+        lat_lng_fraction = max(latFraction, lngFraction) / min(latFraction, lngFraction)
     
         latZoom = zoom(mapDim['height'], WORLD_DIM['height'], latFraction)
         lngZoom = zoom(mapDim['width'], WORLD_DIM['width'], lngFraction)
-        return min(max(latZoom, lngZoom, ZOOM_MIN), ZOOM_MAX)
+        zoomDiff = max(latZoom, lngZoom)
+        
+        if lat_lng_fraction > 10:
+            zoomDiff = max(latZoom, lngZoom) - min(latZoom, lngZoom)
+            
+        return min(max(zoomDiff, ZOOM_MIN), ZOOM_MAX)
     
     
 def getMetricLabel(metric):

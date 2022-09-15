@@ -518,14 +518,19 @@ def doBoxPlots(splitPlots, metricList, metricsRequired, network, stations, locat
     for metric in metricsRequired:
         metricDF = reportUtils.addMetricToDF(metric, metricDF, network, stations, locations, channels, startDate, endDate)
     
+    
     if metricDF.empty:
-        print(f"**** WARNING: No metrics retrieved for {network}.{stations}.{locations}.{channels} {startDate}-{endDate} - services could be down or metrics may not exist for data yet ****")
+        print(f"        WARNING: No metrics retrieved for {network}.{stations}.{locations}.{channels} {startDate}-{endDate} - services could be down or metrics may not exist for data yet")
         boxPlotDictionary = {}
         actualChannels = list()
         scaledDF = pd.DataFrame()
         splitPlots = False
-        
+
     else:
+        if 'sample_rms' not in metricDF.columns:
+            print(f"        WARNING: No sample_rms metrics retrieved for {network}.{stations}.{locations}.{channels} {startDate}-{endDate} - metrics may not exist for data yet")  
+            print(f"        WARNING: Will not be able to select PDFs or Spectrograms")
+        
         # Create a list of all channels that actually have metrics
         actualChannels = sorted(list(set([x[3] for x in metricDF['target'].str.split('.')])))    
         actualChannelsText = ','.join(actualChannels)
@@ -594,7 +599,7 @@ def doBoxPlots(splitPlots, metricList, metricsRequired, network, stations, locat
 
         scaledDF= metricDF.copy()   
         # scale sample_rms by "scale" from station ws
-        if 'sample_rms' in metricList:
+        if 'sample_rms' in scaledDF.columns:
             print("    INFO: Applying scale factor to sample_rms")
 
             try:
@@ -620,12 +625,14 @@ def doBoxPlots(splitPlots, metricList, metricsRequired, network, stations, locat
             tmpDF = scaledDF[scaledDF['target'].str.endswith(channelGroup)]
             grouped = tmpDF.groupby(['station'])
             
-            
             filenames = list()
             for metric in metricList:
-                fig = plt.Figure(figsize=(3,  0.2*nBoxPlotSta))
                 if metric == 'sample_rms':
                     metric = "scale_corrected_sample_rms"
+                if metric not in tmpDF.columns:
+                    continue
+                fig = plt.Figure(figsize=(3,  0.2*nBoxPlotSta))
+                
                 
                 try:
                     # This may fail if the metric wasn't accessible from web services
