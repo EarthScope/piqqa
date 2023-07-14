@@ -1,7 +1,7 @@
 # PIQQA
 The PI's Quick Quality Assessment   
 
-PIQQA is python utility to create a simple Quality Assurance report. Developed by the IRIS DMC, this tool is intended for use by the PASSCAL Instrument Center, meant to generate an easy-to-digest QA report for PIs after their experiment wraps.
+PIQQA is python utility to create a simple Quality Assurance report. Developed by the IRIS DMC (now EarthScope), this tool is intended for use by the PASSCAL Instrument Center, meant to generate an easy-to-digest QA report for PIs after their experiment wraps.
 
 The command-line utility retrieves MUSTANG metrics, PDFs, and spectrograms, as well as metadata from the IRIS station service, putting them all together in a report.
 
@@ -14,7 +14,7 @@ PDFs and Spectrograms are displayed for the stations with the smallest and great
 
 ## Installation
 
-PIQQA is distributed through _GitHub_, via IRIS's public repository (_iris-edu_). You will use a ```git``` 
+PIQQA is distributed through _GitHub_, via EarthScope's public repository (_EarthScope_). You will use a ```git``` 
 client command to get a copy of the latest stable release. In addition, you will use the ```miniconda``` 
 python package manager to create a customized Python environment designed to run PIQQA properly.
 
@@ -36,7 +36,7 @@ After you have git installed, you will download the PIQQA distribution into a di
 from GitHub by opening a text terminal and typing:
 
 ```
-git clone https://github.com/iris-edu/piqqa.git
+git clone https://github.com/EarthScope/piqqa.git
 ```
 
 This will produce a copy of this code distribution in the directory you have chosen. When new piqqa versions 
