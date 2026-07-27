@@ -27,7 +27,19 @@ from io import StringIO
 import pandas as pd
 import numpy as np
 import time
-import urllib
+import urllib.request
+
+USER_AGENT = "earthscope-piqqa"
+
+# pandas' read_csv falls back to urllib for plain http(s) URLs (no fsspec installed),
+# so installing a default opener here also sets the User-Agent for every pd.read_csv(url)
+# call and any bare urllib.request.urlopen() call in this process, not just SESSION.get().
+_opener = urllib.request.build_opener()
+_opener.addheaders = [("User-Agent", USER_AGENT)]
+urllib.request.install_opener(_opener)
+
+SESSION = requests.Session()
+SESSION.headers.update({"User-Agent": USER_AGENT})
 
 
 def get_extents_from_mustang(snclqs, startDate, endDate):
@@ -257,7 +269,7 @@ def getDataStartEnd(
 
 
 def retrieveMetrics(URL, metric):
-    response = requests.get(URL)
+    response = SESSION.get(URL)
     tempDF = pd.read_csv(StringIO(response.text), header=1)
     tempDF.rename(columns={"target": "snclq"}, inplace=True)
     tempDF["target"] = tempDF["snclq"].apply(lambda x: ".".join(x.split(".")[0:4]))
@@ -291,7 +303,7 @@ def checkTsMetricsExist(startDate, endDate, timeout=15):
         f"format=text&timewindow={startDate},{endDate}&nodata=404"
     )
     try:
-        response = requests.get(testURL, timeout=timeout)
+        response = SESSION.get(testURL, timeout=timeout)
         if "Could not find metric" in response.text:
             return False
         return True
@@ -492,14 +504,14 @@ def retrieveExpectedPDFs(NSLC, startDate, endDate):
     cha = f"{NSLC.split('.')[3]}?"
     URL = f"http://service.iris.edu/mustang/noise-pdf-browser/1/availability?network={net}&station={sta}&location={loc}&channel={cha}&starttime={startDate}&endtime={endDate}&interval=all"
 
-    response = requests.get(URL)
+    response = SESSION.get(URL)
     if response.text.startswith("Error"):
         # Wait 5 seconds and try again
         print(
             f"        --> Error retrieving list of expected PDFs for {NSLC}, waiting 5 seconds and trying again"
         )
         time.sleep(5)
-        response = requests.get(URL)
+        response = SESSION.get(URL)
         if response.text.startswith("Error"):
             print(f"        --> Unable to retrieve PDF list for {NSLC}")
             #             print(response.text)
@@ -538,7 +550,7 @@ def getPDF(target, startDate, endDate, spectPowerRange, imageDir):
         f"plot.power.min={spectPowerRange[0]}&plot.power.max={spectPowerRange[1]}&{plotArguments}"
     )
 
-    response = requests.get(URL)
+    response = SESSION.get(URL)
     filename = (f"{imageDir}/{target}_PDF.png").replace("*", "").replace("?", "")
 
     file = open(filename, "wb")
@@ -568,7 +580,7 @@ def getSpectrogram(
         f"plot.time.tickunit=auto&plot.time.invert=false&plot.powerscale.show=true&plot.powerscale.orientation=horz&nodata=404"
     )
 
-    response = requests.get(URL)
+    response = SESSION.get(URL)
     filename = f"{imageDir}/{target}_spectrogram.png"
     file = open(filename, "wb")
     file.write(response.content)
