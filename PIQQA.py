@@ -1240,6 +1240,7 @@ def doPDFs(
                 availabilityExists,
             )
 
+            foundit = False
             print(
                 f"        INFO: Checking percent availability for {thisNetwork}.{thisStation}.{thisLocation}.{thisChannel} to see if there is as least 75% availability"
             )
@@ -1248,7 +1249,6 @@ def doPDFs(
                 thisNetwork, thisStation, thisLocation, thisChannel, thisStart, thisEnd
             )
 
-            foundit = False
             if thisPctAvail > 75:
                 # Then we can use it and break the cycle.
                 foundit = True
@@ -1313,6 +1313,7 @@ def doPDFs(
                 availabilityExists,
             )
 
+            foundit = False
             print(
                 f"        INFO: Checking percent availability for {thisNetwork}.{thisStation}.{thisLocation}.{thisChannel} to see if there is as least 75% availability"
             )
@@ -1321,7 +1322,6 @@ def doPDFs(
                 thisNetwork, thisStation, thisLocation, thisChannel, thisStart, thisEnd
             )
 
-            foundit = False
             if thisPctAvail > 75:
                 # Needs to have >75% and not be the same target that we've already selected for lowest RMS
                 # Then we can use it and break the cycle.  Otherwise break with foundit still = False so it will use the original choice
@@ -1489,6 +1489,7 @@ def doSpectrograms(
                 availabilityExists,
             )
 
+            foundit = False
             print(
                 f"        INFO: Checking percent availability for {thisNetwork}.{thisStation}.{thisLocation}.{thisChannel} to see if there is as least 75% availability"
             )
@@ -1497,7 +1498,6 @@ def doSpectrograms(
                 thisNetwork, thisStation, thisLocation, thisChannel, thisStart, thisEnd
             )
 
-            foundit = False
             if thisPctAvail > 75:
                 # Then we can use it and break the cycle.
                 foundit = True
@@ -1561,6 +1561,7 @@ def doSpectrograms(
                 availabilityExists,
             )
 
+            foundit = False
             print(
                 f"        INFO: Checking percent availability for {thisNetwork}.{thisStation}.{thisLocation}.{thisChannel} to see if there is as least 75% availability"
             )
@@ -1569,7 +1570,6 @@ def doSpectrograms(
                 thisNetwork, thisStation, thisLocation, thisChannel, thisStart, thisEnd
             )
 
-            foundit = False
             if thisPctAvail > 75:
                 # Needs to have >75% and not be the same target that we've already selected for lowest RMS
                 # Then we can use it and break the cycle.  Otherwise break with foundit still = False so it will use the original choice

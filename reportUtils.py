@@ -217,21 +217,39 @@ def getDataStartEnd(
     availabilityExists,
 ):
     """Get the start/end times of the data for a target, via the availability
-    service if it's up, otherwise falling back to MUSTANG extents."""
+    service if it's up, otherwise falling back to MUSTANG extents. Falls back
+    to the report's own startDate/endDate if no start/end can be determined
+    either way (e.g. percent_availability is also down or has no data)."""
+    reportStart = f"{startDate}T00:00:00"
+    reportEnd = f"{endDate}T00:00:00"
+
     if availabilityExists:
         thisStationAvDF, _ = getAvailability(
             [target], startDate, endDate, tolerance, ""
         )
+        if thisStationAvDF.empty:
+            return reportStart, reportEnd
+
         thisAvail = thisStationAvDF[
             (thisStationAvDF["station"] == thisStation)
             & (thisStationAvDF["network"] == thisNetwork)
             & (thisStationAvDF["location"] == thisLocation)
             & (thisStationAvDF["channel"] == thisChannel)
         ]
+        if thisAvail.empty:
+            return reportStart, reportEnd
+
         thisStart = thisAvail["earliest"].dt.strftime("%Y-%m-%dT%H:%M:%S").min()
         thisEnd = thisAvail["latest"].dt.strftime("%Y-%m-%dT%H:%M:%S").max()
     else:
         thisStationAvDF = get_extents_from_mustang([target], startDate, endDate)
+        if thisStationAvDF.empty:
+            print(
+                f"        WARNING: Unable to determine data start/end for {target} "
+                f"(percent_availability returned no data from Mustang), using report timespan instead"
+            )
+            return reportStart, reportEnd
+
         thisStart = thisStationAvDF["earliest"].dt.strftime("%Y-%m-%dT%H:%M:%S").min()
         thisEnd = thisStationAvDF["latest"].dt.strftime("%Y-%m-%dT%H:%M:%S").max()
 
