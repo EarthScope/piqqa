@@ -128,27 +128,27 @@ def doAvailability(
     imageDir,
     tsMetricsExist,
 ):
-    # test out whether the availability service is up and running, if not, then skip the availability plot
+    # test out whether the availability service is up and running; if not, fall back to
+    # MUSTANG percent_availability extents (no gap-level detail) rather than skipping the plot
     availability_exists = True
     availablity_test_url = "https://service.earthscope.org/fdsnws/availability/1"
-    # if the service is returning an HTTP 410, then bypass the availablity plot
     try:
         urllib.request.urlopen(availablity_test_url)
     except urllib.error.HTTPError as e:
         if e.code == 410:
-            print("WARNING: Availability service is down, skipping availability plot")
+            print(
+                "WARNING: Availability service is down, falling back to MUSTANG percent_availability for data extents"
+            )
         else:
             print(
-                f"WARNING: Availability service returned HTTP {e.code}, skipping availability plot"
+                f"WARNING: Availability service returned HTTP {e.code}, falling back to MUSTANG percent_availability for data extents"
             )
         availability_exists = False
-        return {}, splitPlots, {}, [], "", availability_exists
     except Exception as e:
         print(
-            f"WARNING: Availability service is down ({e}), skipping availability plot"
+            f"WARNING: Availability service is down ({e}), falling back to MUSTANG percent_availability for data extents"
         )
         availability_exists = False
-        return {}, splitPlots, {}, [], "", availability_exists
 
     print("INFO: Producing availability plot")
     avFilesDictionary = {}  # collects plot filenames
@@ -290,6 +290,20 @@ def doAvailability(
             topStations = pctAvDF.iloc[:nTop, :]
             bottomStations = pctAvDF.iloc[-nBottom:, :]
 
+            # Station selection only needs MUSTANG percent-availability data, so this stays
+            # populated (for PDFs/Spectrograms downstream) even if the availability service is down.
+            try:
+                topStationList = topStations["station"].tolist()
+            except:
+                topStationList = tmpMetadataDF["station"].tolist()[:nTop]
+
+            topStationsDict[channelGroup] = topStationList
+
+            if not availability_exists:
+                # Can't draw the extents/gaps plot without the availability service - skip the plot,
+                # but topStationsDict above still lets PDFs/Spectrograms pick stations for this channel group.
+                continue
+
             height = max(min(0.3 * nsta, 0.3 * nBoxPlotSta), 2)
             width = 15
             f, (ax1, ax2) = plt.subplots(2, 1, sharex=True, figsize=(width, height))
@@ -309,17 +323,10 @@ def doAvailability(
                 if service not in services_used:
                     services_used.append(service)
 
-            try:
-                topStationList = topStations["station"].tolist()
-            except:
-                topStationList = tmpMetadataDF["station"].tolist()[:nTop]
-
             topLabels = [
                 f"{a} ({b:.3f}%)"
                 for a, b in zip(topStations["station"], topStations["availability"])
             ]
-
-            topStationsDict[channelGroup] = topStationList
 
             datalines = []
             metadatalines = []
@@ -541,7 +548,7 @@ def doAvailability(
             ax2.add_collection(GapLines)
             ax2.autoscale()
             ax2.invert_yaxis()
-            ax2.set_yticks(np.arange(nTop))
+            ax2.set_yticks(np.arange(nBottom))
             ax2.set_yticklabels(bottomLabels)
             ax2.set_xlim(
                 [mpl.dates.datestr2num(startDate), mpl.dates.datestr2num(endDate)]
@@ -578,6 +585,13 @@ def doAvailability(
 
             ## Then repeat for the case where they aren't broken up by top/bottom
         else:
+            allStationList = pctAvDF["station"].tolist()
+            topStationsDict[channelGroup] = allStationList
+
+            if not availability_exists:
+                # Can't draw the extents/gaps plot without the availability service - skip the plot,
+                # but topStationsDict above still lets PDFs/Spectrograms pick stations for this channel group.
+                continue
 
             height = max(min(0.3 * nsta, 0.3 * nBoxPlotSta), 2)
             width = 15
@@ -590,12 +604,10 @@ def doAvailability(
                 if service not in services_used:
                     services_used.append(service)
 
-            allStationList = pctAvDF["station"].tolist()
             allLabels = [
                 f"{a} ({b:.3f}%)"
                 for a, b in zip(pctAvDF["station"], pctAvDF["availability"])
             ]
-            topStationsDict[channelGroup] = allStationList
 
             datalines = []
             metadatalines = []
