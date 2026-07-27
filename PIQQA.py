@@ -39,6 +39,7 @@ import os
 import numpy as np
 import shutil
 import math
+import urllib.request
 
 
 def checkAvailability(
@@ -125,7 +126,29 @@ def doAvailability(
     nBottom,
     tolerance,
     imageDir,
+    tsMetricsExist,
 ):
+    # test out whether the availability service is up and running, if not, then skip the availability plot
+    availability_exists = True
+    availablity_test_url = "https://service.earthscope.org/fdsnws/availability/1"
+    # if the service is returning an HTTP 410, then bypass the availablity plot
+    try:
+        urllib.request.urlopen(availablity_test_url)
+    except urllib.error.HTTPError as e:
+        if e.code == 410:
+            print("WARNING: Availability service is down, skipping availability plot")
+        else:
+            print(
+                f"WARNING: Availability service returned HTTP {e.code}, skipping availability plot"
+            )
+        availability_exists = False
+        return {}, splitPlots, {}, [], "", availability_exists
+    except Exception as e:
+        print(
+            f"WARNING: Availability service is down ({e}), skipping availability plot"
+        )
+        availability_exists = False
+        return {}, splitPlots, {}, [], "", availability_exists
 
     print("INFO: Producing availability plot")
     avFilesDictionary = {}  # collects plot filenames
@@ -162,30 +185,32 @@ def doAvailability(
         tmpMetadataDF = allMetadataDF[allMetadataDF["channel"] == channelGroup]
 
         ## Get percent availability numbers for all targets for this channelGroup so that you can narrow it down to the top/bottom available
-        # First try to use ts_percent_availability_total
+        # First try to use ts_percent_availability_total, unless we already know ts_ metrics are down
         pctAvDF = pd.DataFrame()
 
-        print(
-            f"    INFO: Retrieving percent availability information for {channelGroup}"
-        )
-        try:
-            pctAvDF = reportUtils.addMetricToDF(
-                "ts_percent_availability_total",
-                pctAvDF,
-                network,
-                stations,
-                locations,
-                channelGroup,
-                startDate,
-                endDate,
+        if tsMetricsExist:
+            print(
+                f"    INFO: Retrieving percent availability information for {channelGroup}"
             )
-        except:
-            print(f"ERROR: Trouble accessing ts_percent_availability_total")
+            try:
+                pctAvDF = reportUtils.addMetricToDF(
+                    "ts_percent_availability_total",
+                    pctAvDF,
+                    network,
+                    stations,
+                    locations,
+                    channelGroup,
+                    startDate,
+                    endDate,
+                )
+            except:
+                print(f"ERROR: Trouble accessing ts_percent_availability_total")
 
-        if not pctAvDF.empty:
-            pctAvDF.rename(
-                columns={"ts_percent_availability_total": "availability"}, inplace=True
-            )
+            if not pctAvDF.empty:
+                pctAvDF.rename(
+                    columns={"ts_percent_availability_total": "availability"},
+                    inplace=True,
+                )
 
         # If not all targets have ts_percent_availability_total, then try getting it from percent_availability
 
@@ -405,6 +430,7 @@ def doAvailability(
             bottomStationsAvDF, services = reportUtils.getAvailability(
                 bottomStations["snclq"], startDate, endDate, tolerance, ""
             )
+
             for service in services:
                 if service not in services_used:
                     services_used.append(service)
@@ -422,7 +448,6 @@ def doAvailability(
 
             stn = 0
             for station in bottomStationList:
-
                 # data extents and gaps extents
                 if (
                     not bottomStations[
@@ -715,6 +740,7 @@ def doAvailability(
         avFilesDictionary,
         services_used,
         availabilityType,
+        availability_exists,
     )
 
 
@@ -736,10 +762,17 @@ def doBoxPlots(
     nBottom,
     includeOutliers,
     imageDir,
+    tsMetricsExist,
 ):
     # Retrieve metrics from mustang service
     print("INFO: Generating Boxplots")
     print("    INFO: Retrieving metrics from the MUSTANG webservices...")
+    if not tsMetricsExist:
+        if "ts_num_gaps_total" in metricList:
+            metricList.remove("ts_num_gaps_total")
+        if "ts_num_gaps" in metricList:
+            metricList.remove("ts_num_gaps")
+            metricList.append("num_gaps")
     metricsWithPlots = list()
 
     metricDF = pd.DataFrame()
@@ -1140,6 +1173,7 @@ def doPDFs(
     network,
     stations,
     locations,
+    availabilityExists,
 ):
     pdfDictionary = {}
 
@@ -1194,18 +1228,17 @@ def doPDFs(
             thisChannel = lowestTarget.split(".")[3]
 
             # Check the availablity service to get the start and end to the data
-            thisStationAvDF, service = reportUtils.getAvailability(
-                [lowestTarget], startDate, endDate, tolerance, ""
+            thisStart, thisEnd = reportUtils.getDataStartEnd(
+                lowestTarget,
+                thisNetwork,
+                thisStation,
+                thisLocation,
+                thisChannel,
+                startDate,
+                endDate,
+                tolerance,
+                availabilityExists,
             )
-            thisAvail = thisStationAvDF[
-                (thisStationAvDF["station"] == thisStation)
-                & (thisStationAvDF["network"] == thisNetwork)
-                & (thisStationAvDF["location"] == thisLocation)
-                & (thisStationAvDF["channel"] == thisChannel)
-            ]
-
-            thisStart = thisAvail["earliest"].dt.strftime("%Y-%m-%dT%H:%M:%S").min()
-            thisEnd = thisAvail["latest"].dt.strftime("%Y-%m-%dT%H:%M:%S").max()
 
             print(
                 f"        INFO: Checking percent availability for {thisNetwork}.{thisStation}.{thisLocation}.{thisChannel} to see if there is as least 75% availability"
@@ -1268,18 +1301,17 @@ def doPDFs(
             thisChannel = largestTarget.split(".")[3]
 
             # Get start and end to the data for this target
-            thisStationAvDF, service = reportUtils.getAvailability(
-                [largestTarget], startDate, endDate, tolerance, ""
+            thisStart, thisEnd = reportUtils.getDataStartEnd(
+                largestTarget,
+                thisNetwork,
+                thisStation,
+                thisLocation,
+                thisChannel,
+                startDate,
+                endDate,
+                tolerance,
+                availabilityExists,
             )
-            thisAvail = thisStationAvDF[
-                (thisStationAvDF["station"] == thisStation)
-                & (thisStationAvDF["network"] == thisNetwork)
-                & (thisStationAvDF["location"] == thisLocation)
-                & (thisStationAvDF["channel"] == thisChannel)
-            ]
-
-            thisStart = thisAvail["earliest"].dt.strftime("%Y-%m-%dT%H:%M:%S").min()
-            thisEnd = thisAvail["latest"].dt.strftime("%Y-%m-%dT%H:%M:%S").max()
 
             print(
                 f"        INFO: Checking percent availability for {thisNetwork}.{thisStation}.{thisLocation}.{thisChannel} to see if there is as least 75% availability"
@@ -1378,6 +1410,7 @@ def doSpectrograms(
     powerRanges,
     spectColorPalette,
     imageDir,
+    availabilityExists,
 ):
     spectDictionary = {}  # used to track the plots to be used in the final report
 
@@ -1444,18 +1477,17 @@ def doSpectrograms(
             thisChannel = lowestTarget.split(".")[3]
 
             # Get the start and end to the data for this target
-            thisStationAvDF, service = reportUtils.getAvailability(
-                [lowestTarget], startDate, endDate, tolerance, ""
+            thisStart, thisEnd = reportUtils.getDataStartEnd(
+                lowestTarget,
+                thisNetwork,
+                thisStation,
+                thisLocation,
+                thisChannel,
+                startDate,
+                endDate,
+                tolerance,
+                availabilityExists,
             )
-            thisAvail = thisStationAvDF[
-                (thisStationAvDF["station"] == thisStation)
-                & (thisStationAvDF["network"] == thisNetwork)
-                & (thisStationAvDF["location"] == thisLocation)
-                & (thisStationAvDF["channel"] == thisChannel)
-            ]
-
-            thisStart = thisAvail["earliest"].dt.strftime("%Y-%m-%dT%H:%M:%S").min()
-            thisEnd = thisAvail["latest"].dt.strftime("%Y-%m-%dT%H:%M:%S").max()
 
             print(
                 f"        INFO: Checking percent availability for {thisNetwork}.{thisStation}.{thisLocation}.{thisChannel} to see if there is as least 75% availability"
@@ -1517,18 +1549,17 @@ def doSpectrograms(
             thisChannel = largestTarget.split(".")[3]
 
             # Get the start/end times of the data for this target
-            thisStationAvDF, service = reportUtils.getAvailability(
-                [largestTarget], startDate, endDate, tolerance, ""
+            thisStart, thisEnd = reportUtils.getDataStartEnd(
+                largestTarget,
+                thisNetwork,
+                thisStation,
+                thisLocation,
+                thisChannel,
+                startDate,
+                endDate,
+                tolerance,
+                availabilityExists,
             )
-            thisAvail = thisStationAvDF[
-                (thisStationAvDF["station"] == thisStation)
-                & (thisStationAvDF["network"] == thisNetwork)
-                & (thisStationAvDF["location"] == thisLocation)
-                & (thisStationAvDF["channel"] == thisChannel)
-            ]
-
-            thisStart = thisAvail["earliest"].dt.strftime("%Y-%m-%dT%H:%M:%S").min()
-            thisEnd = thisAvail["latest"].dt.strftime("%Y-%m-%dT%H:%M:%S").max()
 
             print(
                 f"        INFO: Checking percent availability for {thisNetwork}.{thisStation}.{thisLocation}.{thisChannel} to see if there is as least 75% availability"
@@ -1704,6 +1735,7 @@ def doReport(
     spectColorPalette,
     powerRanges,
     userDefinedPowerRange,
+    availabilityExists,
 ):
     print(f"INFO: Writing to file {outfile}")
 
@@ -1749,11 +1781,17 @@ def doReport(
     )
 
     ###### AVAILABILITY ######
-    for service in services:
-        stationServiceLink = f'<a href="http://service.iris.edu/{service}/station/1/" target="_blank">{service}-station service</a>,'
-        availabilityServiceLink = f'<a href="http://service.iris.edu/{service}/availability/1/" target="_blank">{service}-availability service</a>,'
-    stationServiceLink = f"{stationServiceLink[:-1]}"
-    availabilityServiceLink = f"{availabilityServiceLink[:-1]}"
+    # for service in services:
+    #     stationServiceLink = f'<a href="http://service.iris.edu/{service}/station/1/" target="_blank">{service}-station service</a>,'
+    #     availabilityServiceLink = f'<a href="http://service.iris.edu/{service}/availability/1/" target="_blank">{service}-availability service</a>,'
+    # stationServiceLink = f"{stationServiceLink[:-1]}"
+    if availabilityExists:
+        availabilityServiceLink = (
+            f"http://service.earthscope.org/fdsnws/availability/1/"
+        )
+    else:
+        availabilityServiceLink = f'<a href="http://service.earthscope.org/mustang/measurements/1/" target="_blank">mustang service</a>'
+    stationServiceLink = f'<a href="http://service.earthscope.org/fdsnws/station/1/" target="_blank">fdsnws-station service</a>'
 
     availabilityIntroText = (
         f"The plot(s) below gives an overview of the available data for the requested timespan. "
@@ -2753,22 +2791,32 @@ def main():
     nTop = int(nBoxPlotSta / 2)
     nBottom = int(nBoxPlotSta - nTop)
 
+    # Check independently whether the ts_ (time-series) MUSTANG metrics exist right now -
+    # this can go down (or come back) on its own schedule, separate from the fdsnws-availability service
+    tsMetricsExist = reportUtils.checkTsMetricsExist(startDate, endDate)
+
     # Create Availability Plots
-    [topStationsDict, splitPlots, avFilesDictionary, services, availabilityType] = (
-        doAvailability(
-            splitPlots,
-            startDate,
-            endDate,
-            network,
-            stations,
-            locations,
-            channels,
-            nBoxPlotSta,
-            nTop,
-            nBottom,
-            tolerance,
-            imageDir,
-        )
+    [
+        topStationsDict,
+        splitPlots,
+        avFilesDictionary,
+        services,
+        availabilityType,
+        availabilityExists,
+    ] = doAvailability(
+        splitPlots,
+        startDate,
+        endDate,
+        network,
+        stations,
+        locations,
+        channels,
+        nBoxPlotSta,
+        nTop,
+        nBottom,
+        tolerance,
+        imageDir,
+        tsMetricsExist,
     )
 
     # Create BoxPlots
@@ -2788,6 +2836,7 @@ def main():
             nBottom,
             includeOutliers,
             imageDir,
+            tsMetricsExist,
         )
     )
 
@@ -2806,6 +2855,7 @@ def main():
         network,
         stations,
         locations,
+        availabilityExists,
     )
 
     # Create Spectrogram Plots
@@ -2821,6 +2871,7 @@ def main():
         powerRanges,
         spectColorPalette,
         imageDir,
+        availabilityExists,
     )
 
     # Generate Station Map
@@ -2868,6 +2919,7 @@ def main():
         spectColorPalette,
         powerRanges,
         userDefinedPowerRange,
+        availabilityExists,
     )
 
     # Zip the report
