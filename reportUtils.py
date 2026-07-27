@@ -489,7 +489,6 @@ def getMetadata(network, stations, locations, channels, startDate, endDate, leve
                 tmpDF = pd.DataFrame()
 
             stationDF = pd.concat([stationDF, tmpDF], ignore_index=True)
-            print(stationDF)
     except:
         print("    ERROR: Unable to retrieve metadata")
         return stationDF
