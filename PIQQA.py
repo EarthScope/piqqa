@@ -131,7 +131,7 @@ def doAvailability(
     # test out whether the availability service is up and running; if not, fall back to
     # MUSTANG percent_availability extents (no gap-level detail) rather than skipping the plot
     availability_exists = True
-    availablity_test_url = "https://service.earthscope.org/fdsnws/availability/1"
+    availablity_test_url = "https://service.earthscope.org/fdsnws/availability/1/"
     try:
         urllib.request.urlopen(availablity_test_url)
     except urllib.error.HTTPError as e:
