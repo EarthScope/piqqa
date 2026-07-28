@@ -89,6 +89,44 @@ def get_extents_from_mustang(snclqs, startDate, endDate):
     return availabilityDF
 
 
+def mergeGapsWithinTolerance(availabilityDF, tolerance):
+    """Merge adjacent time spans (per network/station/location/channel/quality) that are
+    separated by a gap no larger than `tolerance` seconds. The availability service used
+    to do this server-side via the mergegaps parameter; the migrated service no longer
+    honors it, so this reproduces the same gap-tolerance behavior client-side instead."""
+    if availabilityDF.empty:
+        return availabilityDF
+
+    tolerance = float(tolerance)
+    groupCols = [
+        c
+        for c in ["network", "station", "location", "channel", "quality"]
+        if c in availabilityDF.columns
+    ]
+    if not groupCols:
+        return availabilityDF
+
+    mergedRows = []
+    for _, group in availabilityDF.groupby(groupCols, dropna=False):
+        group = group.sort_values("earliest")
+        current = None
+        for _, row in group.iterrows():
+            if current is None:
+                current = row.copy()
+                continue
+            gapSeconds = (row["earliest"] - current["latest"]).total_seconds()
+            if gapSeconds <= tolerance:
+                if row["latest"] > current["latest"]:
+                    current["latest"] = row["latest"]
+            else:
+                mergedRows.append(current)
+                current = row.copy()
+        if current is not None:
+            mergedRows.append(current)
+
+    return pd.DataFrame(mergedRows).reset_index(drop=True)
+
+
 def getAvailability(snclqs, startDate, endDate, tolerance, avtype):
     availabilityDF = pd.DataFrame()
     services = []
@@ -117,8 +155,7 @@ def getAvailability(snclqs, startDate, endDate, tolerance, avtype):
             URL = (
                 f"http://service.earthscope.org/{service}/availability/1/query?format=text&"
                 f"net={n}&sta={s}&loc={luse}&cha={c}&quality={q}&"
-                f"starttime={startDate}&endtime={endDate}&orderby=nslc_time_quality_samplerate&"
-                f"mergegaps={tolerance}&includerestricted=true&nodata=404"
+                f"starttime={startDate}&endtime={endDate}&includerestricted=true&nodata=404"
             )
             try:
                 tmpDF = pd.read_csv(
@@ -154,8 +191,7 @@ def getAvailability(snclqs, startDate, endDate, tolerance, avtype):
         URL = (
             f"http://service.earthscope.org/{service}/availability/1/extent?format=text&"
             f"net={nets}&sta={stas}&loc={locs}&cha={chans}&quality={qs}&"
-            f"starttime={startDate}&endtime={endDate}&orderby=nslc_time_quality_samplerate&"
-            f"includerestricted=true&nodata=404"
+            f"starttime={startDate}&endtime={endDate}&includerestricted=true&nodata=404"
         )
         try:
             availabilityDF = pd.read_csv(
@@ -192,8 +228,7 @@ def getAvailability(snclqs, startDate, endDate, tolerance, avtype):
                 URL = (
                     f"http://service.earthscope.org/{service}/availability/1/extent?format=text&"
                     f"net={n}&sta={s}&loc={luse}&cha={c}&quality={q}&"
-                    f"starttime={startDate}&endtime={endDate}&orderby=nslc_time_quality_samplerate&"
-                    f"&includerestricted=true&nodata=404"
+                    f"starttime={startDate}&endtime={endDate}&includerestricted=true&nodata=404"
                 )
 
                 try:
@@ -213,6 +248,11 @@ def getAvailability(snclqs, startDate, endDate, tolerance, avtype):
     #     availabilityDF = availabilityDF.apply(lambda x: x.str.strip() if x.dtype == "object" else x)
     availabilityDF.rename(columns=lambda x: x.strip().lower(), inplace=True)
     availabilityDF.rename(columns={"#network": "network"}, inplace=True)
+
+    if avtype == "":
+        # The availability service no longer merges gaps server-side (the mergegaps
+        # parameter is a no-op on the migrated service), so do it here instead.
+        availabilityDF = mergeGapsWithinTolerance(availabilityDF, tolerance)
 
     return availabilityDF, services
 
