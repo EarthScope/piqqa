@@ -1540,7 +1540,7 @@ def doSpectrograms(
         spectDictionary[f"{channelGroup}_smallest"] = sorted(spectFiles)
 
         # 2. largest corrected sample_rms station
-        print("    INFO: Searching for lowest corrected sample_rms station")
+        print("    INFO: Searching for highest corrected sample_rms station")
         for ii in reversed(range(len(meds.index))):
             largestTarget = meds.index[ii]
             largestNSL = largestTarget[:-3]
