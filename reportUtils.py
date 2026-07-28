@@ -128,8 +128,9 @@ def getAvailability(snclqs, startDate, endDate, tolerance, avtype):
                     parse_dates=["Earliest", "Latest"],
                 )
                 tmpDF["staloc"] = f"{s}.{luse}"
-                availabilityDF = availabilityDF.append(tmpDF, ignore_index=True)
-                print(availabilityDF)
+                availabilityDF = pd.concat(
+                    [availabilityDF, tmpDF], ignore_index=True
+                )
             except Exception as e:
                 pass
 
@@ -205,8 +206,9 @@ def getAvailability(snclqs, startDate, endDate, tolerance, avtype):
                         parse_dates=["Earliest", "Latest"],
                     )
                     tmpDF["staloc"] = f"{s}.{luse}"
-                    availabilityDF = availabilityDF.append(tmpDF, ignore_index=True)
-                    print(availabilityDF)
+                    availabilityDF = pd.concat(
+                        [availabilityDF, tmpDF], ignore_index=True
+                    )
                 except:
                     pass
 
