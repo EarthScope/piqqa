@@ -429,8 +429,6 @@ def getMetadata(network, stations, locations, channels, startDate, endDate, leve
                     if "earthscope" in serviceURL or "iris" in serviceURL:
                         services.append(serviceURL)
 
-            print(f"TEMP: services = {services}")
-
         except Exception as e:
             print(
                 "        ERROR: unable to retrieve fed catalog information about where the data lives - %s\n%s "
