@@ -24,7 +24,7 @@ under the License.
 
 """
 
-version = "v1.0.2"
+version = "v1.1.0"
 
 import reportUtils
 import pandas as pd
@@ -549,7 +549,7 @@ def doAvailability(
             ax2.autoscale()
             ax2.invert_yaxis()
             ax2.set_yticks(np.arange(nBottom))
-            ax2.set_yticklabels(bottomLabels)
+            ax2.set_yticklabels(bottfomLabels)
             ax2.set_xlim(
                 [mpl.dates.datestr2num(startDate), mpl.dates.datestr2num(endDate)]
             )
@@ -1883,7 +1883,9 @@ def doReport(
                 availabilityOutroText = f'{availabilityOutroText}<br/><a href="{serviceLink}" target="_blank">{serviceLink}</a>'
 
         except:
-            availabilityOutroText = "No availability was found for the selected channels."
+            availabilityOutroText = (
+                "No availability was found for the selected channels."
+            )
     else:
         availabilityOutroText = (
             "The availability service was unavailable when this report was generated, "
