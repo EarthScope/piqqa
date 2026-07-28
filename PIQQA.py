@@ -104,7 +104,7 @@ def checkAvailability(
     except:
         thisPctAvail = 0
         print(
-            f"**** WARNING: No Percent Availability found for {thisNetwork.thisStation.thisLocation.thisChannel} - are services down? ****"
+            f"**** WARNING: No Percent Availability found for {thisNetwork}.{thisStation}.{thisLocation}.{thisChannel} - are services down? ****"
         )
 
     return thisPctAvail
