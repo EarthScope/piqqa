@@ -122,7 +122,7 @@ Running PIQQA.py without any arguments, or with the -h/--h flags, will produce s
         --metrics=: comma-separated list of metrics to run for the boxplots; defaults: ts_channel_continuity,sample_rms,ts_num_gaps
         --maxplot=: number of stations to include in the boxplots; defaults to 30
         --colorpalette=: color palette for spectrograms; defaults to 'RdYlBu'
-            options available at http://service.iris.edu/mustang/noise-spectrogram/1/
+            options available at http://service.earthscope.org/mustang/noise-spectrogram/1/
         --includeoutliers=: whether to include outliers in the boxplots, True/False; defaults to False
         --spectralrange=: power range to use in the PDFs and spectrograms, comma separated values:  min, max; defaults depend on channel type
         --basemap=: the name of the basemap to be used for the map; defaults to 'stamen-terrain'
@@ -149,7 +149,7 @@ In addition to those fields, there are a number of optional fields.
 
 `maxplot` is how you can limit the number of stations displayed in the boxplots.
 
-`colorpalette` determines the color palette used in the PDFs and spectrograms, and a list of all options can be found in the service interface page for the [noise-spectrgram](http://service.iris.edu/mustang/noise-spectrogram/1/) service
+`colorpalette` determines the color palette used in the PDFs and spectrograms, and a list of all options can be found in the service interface page for the [noise-spectrgram](http://service.earthscope.org/mustang/noise-spectrogram/1/) service
 
 `includeoutliers` toggles the outliers on/off in the boxplots. Generally, it is easier to view the boxplots with the outliers turned off, but there may be cases where they should be displayed.
 
