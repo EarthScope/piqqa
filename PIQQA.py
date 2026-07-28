@@ -175,7 +175,7 @@ def doAvailability(
         actualChannels = sorted(list(set(allMetadataDF["channel"])))
     except:
         quit(
-            "\nQUITTING: No information found for network and times, is something wrong? Is there data at IRIS for this network? Does this network have channels with the Z component?"
+            "\nQUITTING: No information found for network and times, is something wrong? Is there data at EarthScope for this network? Does this network have channels with the Z component?"
         )
 
     ## Loop over the channel groups
