@@ -42,18 +42,20 @@ import math
 
 
 def checkAvailability(
-    thisNetwork, thisStation, thisLocation, thisChannel, thisStart, thisEnd
+    thisNetwork, thisStation, thisLocation, thisChannel, thisStart, thisEnd, tsMetricsExist
 ):
-    thisAvDF = reportUtils.addMetricToDF(
-        "ts_percent_availability_total",
-        pd.DataFrame(),
-        thisNetwork,
-        thisStation,
-        thisLocation,
-        thisChannel,
-        thisStart,
-        thisEnd,
-    )
+    thisAvDF = pd.DataFrame()
+    if tsMetricsExist:
+        thisAvDF = reportUtils.addMetricToDF(
+            "ts_percent_availability_total",
+            pd.DataFrame(),
+            thisNetwork,
+            thisStation,
+            thisLocation,
+            thisChannel,
+            thisStart,
+            thisEnd,
+        )
 
     if thisAvDF.empty:
         # need to round out the start and end times for non-ts_percent_availability_total, in case it's very short
@@ -1179,6 +1181,7 @@ def doPDFs(
     stations,
     locations,
     availabilityExistsByService,
+    tsMetricsExist,
 ):
     pdfDictionary = {}
 
@@ -1251,7 +1254,13 @@ def doPDFs(
             )
             # get the ts_percent_availatility_total (or percent_availability if ph5) for the time between the data start and end.
             thisPctAvail = checkAvailability(
-                thisNetwork, thisStation, thisLocation, thisChannel, thisStart, thisEnd
+                thisNetwork,
+                thisStation,
+                thisLocation,
+                thisChannel,
+                thisStart,
+                thisEnd,
+                tsMetricsExist,
             )
 
             if thisPctAvail > 75:
@@ -1324,7 +1333,13 @@ def doPDFs(
             )
             # get the percent availability between the start and end times of the data
             thisPctAvail = checkAvailability(
-                thisNetwork, thisStation, thisLocation, thisChannel, thisStart, thisEnd
+                thisNetwork,
+                thisStation,
+                thisLocation,
+                thisChannel,
+                thisStart,
+                thisEnd,
+                tsMetricsExist,
             )
 
             if thisPctAvail > 75:
@@ -1416,6 +1431,7 @@ def doSpectrograms(
     spectColorPalette,
     imageDir,
     availabilityExistsByService,
+    tsMetricsExist,
 ):
     spectDictionary = {}  # used to track the plots to be used in the final report
 
@@ -1500,7 +1516,13 @@ def doSpectrograms(
             )
             # Get the percent availability between the start and end for this target
             thisPctAvail = checkAvailability(
-                thisNetwork, thisStation, thisLocation, thisChannel, thisStart, thisEnd
+                thisNetwork,
+                thisStation,
+                thisLocation,
+                thisChannel,
+                thisStart,
+                thisEnd,
+                tsMetricsExist,
             )
 
             if thisPctAvail > 75:
@@ -1572,7 +1594,13 @@ def doSpectrograms(
             )
             # Get the percent availability between the start and end times for this target
             thisPctAvail = checkAvailability(
-                thisNetwork, thisStation, thisLocation, thisChannel, thisStart, thisEnd
+                thisNetwork,
+                thisStation,
+                thisLocation,
+                thisChannel,
+                thisStart,
+                thisEnd,
+                tsMetricsExist,
             )
 
             if thisPctAvail > 75:
@@ -2877,6 +2905,7 @@ def main():
         stations,
         locations,
         availabilityExistsByService,
+        tsMetricsExist,
     )
 
     # Create Spectrogram Plots
@@ -2893,6 +2922,7 @@ def main():
         spectColorPalette,
         imageDir,
         availabilityExistsByService,
+        tsMetricsExist,
     )
 
     # Generate Station Map
