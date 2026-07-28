@@ -128,9 +128,7 @@ def getAvailability(snclqs, startDate, endDate, tolerance, avtype):
                     parse_dates=["Earliest", "Latest"],
                 )
                 tmpDF["staloc"] = f"{s}.{luse}"
-                availabilityDF = pd.concat(
-                    [availabilityDF, tmpDF], ignore_index=True
-                )
+                availabilityDF = pd.concat([availabilityDF, tmpDF], ignore_index=True)
             except Exception as e:
                 pass
 
@@ -419,7 +417,7 @@ def getMetadata(network, stations, locations, channels, startDate, endDate, leve
             f"starttime={startDate}&endtime={endDate}"
             f"&format=request&includeoverlaps=false"
         )
-
+        print(f"        {fedURL}")
         try:
             with urllib.request.urlopen(fedURL) as response:
                 html_content = response.read().decode("utf-8")
@@ -428,8 +426,10 @@ def getMetadata(network, stations, locations, channels, startDate, endDate, leve
             for ln in html_content.split("\n"):
                 if ln.startswith("STATIONSERVICE="):
                     serviceURL = ln.split("=")[1]
-                    if "earthscope" in serviceURL:
+                    if "earthscope" in serviceURL or "iris" in serviceURL:
                         services.append(serviceURL)
+
+            print(f"TEMP: services = {services}")
 
         except Exception as e:
             print(
