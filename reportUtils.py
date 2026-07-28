@@ -444,6 +444,7 @@ def getMetadata(network, stations, locations, channels, startDate, endDate, leve
         for service in services:
             # To prevent needing to know a priori where it's from, try both and only add if attempt is successful
             # Most experiments are one-archive only, but some have been split in the past
+            tmpDF = pd.DataFrame()
             try:
                 print("        Calling on Station Service")
                 stationURL = (
@@ -477,6 +478,7 @@ def getMetadata(network, stations, locations, channels, startDate, endDate, leve
                         print(
                             f"    ERROR: Unable to retrieve channel information from {stationURL}"
                         )
+                        tmpDF = pd.DataFrame()
 
                 elif level == "station" or level == "network":
                     try:
@@ -486,11 +488,17 @@ def getMetadata(network, stations, locations, channels, startDate, endDate, leve
                         print(
                             f"        ERROR: Unable to retrieve metadata information from {stationURL}"
                         )
+                        tmpDF = pd.DataFrame()
 
             except:
                 tmpDF = pd.DataFrame()
 
-            stationDF = pd.concat([stationDF, tmpDF], ignore_index=True)
+            if tmpDF.empty:
+                continue
+            if stationDF.empty:
+                stationDF = tmpDF.copy()
+            else:
+                stationDF = pd.concat([stationDF, tmpDF], ignore_index=True)
     except:
         print("    ERROR: Unable to retrieve metadata")
         return stationDF
