@@ -865,7 +865,7 @@ def doBoxPlots(
                         if tmpDF.empty:
                             tmpDF = thisDF.copy()
                         else:
-                            tmpDF = tmpDF.append(thisDF, ignore_index=True)
+                            tmpDF = pd.concat([tmpDF, thisDF], ignore_index=True)
 
                     columnsToKeep = [
                         "snclq",
@@ -976,7 +976,7 @@ def doBoxPlots(
             print(f"    INFO: Generating Boxplots for {channelGroup}")
 
             tmpDF = scaledDF[scaledDF["target"].str.endswith(channelGroup)]
-            grouped = tmpDF.groupby(["station"])
+            grouped = tmpDF.groupby("station")
 
             filenames = list()
             for metric in metricList:
@@ -1203,7 +1203,7 @@ def doPDFs(
         # Use the dataframe with the SCALED sample_rms to determine the top/bottom station/target
         tmpDF = scaledDF[scaledDF["target"].str.endswith(channelGroup)]
 
-        grouped = tmpDF.groupby(["snclq"])
+        grouped = tmpDF.groupby("snclq")
 
         try:
             df2 = pd.DataFrame(
@@ -1451,7 +1451,7 @@ def doSpectrograms(
         ]
 
         # Select the lowest and greatest rms from those stations
-        grouped = tmpDF.groupby(["snclq"])
+        grouped = tmpDF.groupby("snclq")
 
         try:
             df2 = pd.DataFrame(
