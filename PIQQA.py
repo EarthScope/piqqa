@@ -1798,9 +1798,7 @@ def doReport(
     #     availabilityServiceLink = f'<a href="http://service.earthscope.org/{service}/availability/1/" target="_blank">{service}-availability service</a>,'
     # stationServiceLink = f"{stationServiceLink[:-1]}"
     if availabilityExists:
-        availabilityServiceLink = (
-            f"http://service.earthscope.org/fdsnws/availability/1/"
-        )
+        availabilityServiceLink = f'<a href="http://service.earthscope.org/fdsnws/availability/1/" target="_blank">fdsnws-availability service</a>'
     else:
         availabilityServiceLink = f'<a href="http://service.earthscope.org/mustang/measurements/1/" target="_blank">mustang service</a>'
     stationServiceLink = f'<a href="http://service.earthscope.org/fdsnws/station/1/" target="_blank">fdsnws-station service</a>'
@@ -1850,33 +1848,47 @@ def doReport(
             f"{availabilityIntroText} <br/>Displaying all stations in the network.<br/>"
         )
 
-    try:
-        availabilityOutroText = "To view the availability numbers used to create the availability plot(s), see:"
+    if not availabilityExists:
+        availabilityIntroText = (
+            f"{availabilityIntroText} <br/><br/>"
+            f"<b>Note:</b> the fdsnws-availability service was unavailable when this report was generated, "
+            f"so the data-extent and gap plot(s) below could not be produced. Station selection above was "
+            f"still based on percent-availability metrics from MUSTANG.<br/>"
+        )
 
-        for service in services:
-            serviceLink = (
-                f"http://service.earthscope.org/{service}/availability/1/query?format=text&"
-                f'net={network}&sta={stations}&loc={locations}&cha={",".join(chans)}&'
-                f"starttime={startDate}&endtime={endDate}&orderby=nslc_time_quality_samplerate&"
-                f"mergegaps={tolerance}&includerestricted=true&nodata=404"
-            )
+    if services:
+        try:
+            availabilityOutroText = "To view the availability numbers used to create the availability plot(s), see:"
 
-            availabilityOutroText = f'<br/>{availabilityOutroText} <br/><a href="{serviceLink}" target="_blank">{serviceLink}</a>'
+            for service in services:
+                serviceLink = (
+                    f"http://service.earthscope.org/{service}/availability/1/query?format=text&"
+                    f'net={network}&sta={stations}&loc={locations}&cha={",".join(chans)}&'
+                    f"starttime={startDate}&endtime={endDate}&orderby=nslc_time_quality_samplerate&"
+                    f"mergegaps={tolerance}&includerestricted=true&nodata=404"
+                )
 
-        availabilityOutroText = f"{availabilityOutroText}<br/><br/>To view the channel metadata time extents used, see: "
+                availabilityOutroText = f'<br/>{availabilityOutroText} <br/><a href="{serviceLink}" target="_blank">{serviceLink}</a>'
 
-        for service in services:
-            serviceLink = (
-                f"http://service.earthscope.org/{service}/station/1/query?"
-                f'net={network}&sta={stations}&loc={locations}&cha={",".join(chans)}&'
-                f"starttime={startDate}&endtime={endDate}&level=channel&"
-                f"format=text&includecomments=true&nodata=404"
-            )
+            availabilityOutroText = f"{availabilityOutroText}<br/><br/>To view the channel metadata time extents used, see: "
 
-            availabilityOutroText = f'{availabilityOutroText}<br/><a href="{serviceLink}" target="_blank">{serviceLink}</a>'
+            for service in services:
+                serviceLink = (
+                    f"http://service.earthscope.org/{service}/station/1/query?"
+                    f'net={network}&sta={stations}&loc={locations}&cha={",".join(chans)}&'
+                    f"starttime={startDate}&endtime={endDate}&level=channel&"
+                    f"format=text&includecomments=true&nodata=404"
+                )
 
-    except:
-        availabilityOutroText = "No availability was found for the selected channels."
+                availabilityOutroText = f'{availabilityOutroText}<br/><a href="{serviceLink}" target="_blank">{serviceLink}</a>'
+
+        except:
+            availabilityOutroText = "No availability was found for the selected channels."
+    else:
+        availabilityOutroText = (
+            "The availability service was unavailable when this report was generated, "
+            "so there are no availability/metadata query links to display for this section."
+        )
 
     ###### BOXPLOTS ######
     defaultMetricText = "The metrics presented here are"
