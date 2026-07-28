@@ -226,14 +226,20 @@ def getDataStartEnd(
     startDate,
     endDate,
     tolerance,
-    availabilityExists,
+    availabilityExistsByService,
 ):
     """Get the start/end times of the data for a target, via the availability
     service if it's up, otherwise falling back to MUSTANG extents. Falls back
     to the report's own startDate/endDate if no start/end can be determined
-    either way (e.g. percent_availability is also down or has no data)."""
+    either way (e.g. percent_availability is also down or has no data).
+    availabilityExistsByService is a dict like {"fdsnws": True, "ph5ws": False} -
+    the target's own quality code (its last dot-component) picks which entry applies,
+    since fdsnws-availability and ph5ws-availability can go down independently."""
     reportStart = f"{startDate}T00:00:00"
     reportEnd = f"{endDate}T00:00:00"
+
+    serviceKey = serviceForQuality(target.split(".")[-1])
+    availabilityExists = availabilityExistsByService.get(serviceKey, False)
 
     if availabilityExists:
         thisStationAvDF, _ = getAvailability(
@@ -370,6 +376,95 @@ def addMetricToDF(
     return DF
 
 
+def serviceForQuality(quality):
+    # PH5/PASSCAL data (quality "D") is served by ph5ws (service.iris.edu), while
+    # regular FDSN data (quality "M") is served by fdsnws (service.earthscope.org) -
+    # these can go down independently of each other.
+    return "ph5ws" if quality == "D" else "fdsnws"
+
+
+def getAvailabilityServiceURLs(
+    network, stations, locations, channels, startDate, endDate
+):
+    """Determine which availability service(s) - fdsnws and/or ph5ws - actually apply
+    to this network via FedCatalog, so callers can check/use the correct one(s) instead
+    of assuming fdsnws. Returns a dict like {"fdsnws": "https://.../availability/1/"}.
+    """
+    chanList = list()
+    for chan in channels.split(","):
+        if (len(chan) == 3) and (chan[2] in ["*", "?", ".", "_"]):
+            chan = f"{chan[0:2]}Z"
+        elif len(chan) == 2:
+            chan = f"{chan}Z"
+        elif chan == "*":
+            chan = "??Z"
+        chanList.append(chan)
+
+    fedURL = (
+        f"http://service.earthscope.org/irisws/fedcatalog/1/query?"
+        f"net={network}&sta={stations}&loc={locations}&cha={','.join(chanList)}&"
+        f"starttime={startDate}&endtime={endDate}"
+        f"&format=request&includeoverlaps=false"
+    )
+
+    serviceURLs = {}
+    try:
+        with urllib.request.urlopen(fedURL) as response:
+            html_content = response.read().decode("utf-8")
+        for ln in html_content.split("\n"):
+            if ln.startswith("AVAILABILITYSERVICE="):
+                url = ln.split("=")[1]
+                if "ph5ws" in url:
+                    serviceURLs["ph5ws"] = url
+                elif "fdsnws" in url:
+                    serviceURLs["fdsnws"] = url
+    except Exception as e:
+        print(
+            f"        ERROR: unable to retrieve fed catalog information about where the data lives - {fedURL}\n{e}"
+        )
+        # Fall back to checking both - each is probed independently, so this is conservative, not incorrect.
+        serviceURLs = {
+            "fdsnws": "https://service.earthscope.org/fdsnws/availability/1/",
+            "ph5ws": "http://service.iris.edu/ph5ws/availability/1/",
+        }
+
+    return serviceURLs
+
+
+def checkAvailabilityServicesExist(
+    network, stations, locations, channels, startDate, endDate
+):
+    """Probe each availability service relevant to this network independently, since
+    fdsnws-availability and ph5ws-availability can go down independently of each other.
+    Returns a dict like {"fdsnws": True, "ph5ws": False} covering only the service(s)
+    actually relevant to this network."""
+    serviceURLs = getAvailabilityServiceURLs(
+        network, stations, locations, channels, startDate, endDate
+    )
+    availabilityExistsByService = {}
+    for serviceKey, url in serviceURLs.items():
+        try:
+            urllib.request.urlopen(url)
+            availabilityExistsByService[serviceKey] = True
+        except urllib.error.HTTPError as e:
+            if e.code == 410:
+                print(
+                    f"WARNING: {serviceKey}-availability service is down, falling back to MUSTANG percent_availability for data extents"
+                )
+            else:
+                print(
+                    f"WARNING: {serviceKey}-availability service returned HTTP {e.code}, falling back to MUSTANG percent_availability for data extents"
+                )
+            availabilityExistsByService[serviceKey] = False
+        except Exception as e:
+            print(
+                f"WARNING: {serviceKey}-availability service is down ({e}), falling back to MUSTANG percent_availability for data extents"
+            )
+            availabilityExistsByService[serviceKey] = False
+
+    return availabilityExistsByService
+
+
 def getMetadata(network, stations, locations, channels, startDate, endDate, level):
     # This one and getStations are almost redundant, except that they return at different
     # levels. Merge into one function that also takes level as an input?
@@ -417,7 +512,6 @@ def getMetadata(network, stations, locations, channels, startDate, endDate, leve
             f"starttime={startDate}&endtime={endDate}"
             f"&format=request&includeoverlaps=false"
         )
-        print(f"        {fedURL}")
         try:
             with urllib.request.urlopen(fedURL) as response:
                 html_content = response.read().decode("utf-8")

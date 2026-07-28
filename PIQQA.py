@@ -39,7 +39,6 @@ import os
 import numpy as np
 import shutil
 import math
-import urllib.request
 
 
 def checkAvailability(
@@ -128,27 +127,12 @@ def doAvailability(
     imageDir,
     tsMetricsExist,
 ):
-    # test out whether the availability service is up and running; if not, fall back to
+    # Test whether the availability service(s) relevant to this network are up (fdsnws-availability
+    # and ph5ws-availability can go down independently of each other); if not, fall back to
     # MUSTANG percent_availability extents (no gap-level detail) rather than skipping the plot
-    availability_exists = True
-    availablity_test_url = "https://service.earthscope.org/fdsnws/availability/1/"
-    try:
-        urllib.request.urlopen(availablity_test_url)
-    except urllib.error.HTTPError as e:
-        if e.code == 410:
-            print(
-                "WARNING: Availability service is down, falling back to MUSTANG percent_availability for data extents"
-            )
-        else:
-            print(
-                f"WARNING: Availability service returned HTTP {e.code}, falling back to MUSTANG percent_availability for data extents"
-            )
-        availability_exists = False
-    except Exception as e:
-        print(
-            f"WARNING: Availability service is down ({e}), falling back to MUSTANG percent_availability for data extents"
-        )
-        availability_exists = False
+    availability_exists_by_service = reportUtils.checkAvailabilityServicesExist(
+        network, stations, locations, channels, startDate, endDate
+    )
 
     print("INFO: Producing availability plot")
     avFilesDictionary = {}  # collects plot filenames
@@ -284,6 +268,15 @@ def doAvailability(
         )  # Only used to get the number of stations, the list isn't actually used otherwise
         nsta = len(stationList)
 
+        # Determine which availability service(s) this channel group's targets actually need
+        # (fdsnws and/or ph5ws), and only draw the extents/gaps plot if all of them are up.
+        relevantServices = {
+            reportUtils.serviceForQuality(s.split(".")[-1]) for s in pctAvDF["snclq"]
+        }
+        channelGroupAvailabilityExists = all(
+            availability_exists_by_service.get(svc, False) for svc in relevantServices
+        )
+
         if nsta > nBoxPlotSta:
             splitPlots = 1
 
@@ -299,7 +292,7 @@ def doAvailability(
 
             topStationsDict[channelGroup] = topStationList
 
-            if not availability_exists:
+            if not channelGroupAvailabilityExists:
                 # Can't draw the extents/gaps plot without the availability service - skip the plot,
                 # but topStationsDict above still lets PDFs/Spectrograms pick stations for this channel group.
                 continue
@@ -549,7 +542,7 @@ def doAvailability(
             ax2.autoscale()
             ax2.invert_yaxis()
             ax2.set_yticks(np.arange(nBottom))
-            ax2.set_yticklabels(bottfomLabels)
+            ax2.set_yticklabels(bottomLabels)
             ax2.set_xlim(
                 [mpl.dates.datestr2num(startDate), mpl.dates.datestr2num(endDate)]
             )
@@ -588,7 +581,7 @@ def doAvailability(
             allStationList = pctAvDF["station"].tolist()
             topStationsDict[channelGroup] = allStationList
 
-            if not availability_exists:
+            if not channelGroupAvailabilityExists:
                 # Can't draw the extents/gaps plot without the availability service - skip the plot,
                 # but topStationsDict above still lets PDFs/Spectrograms pick stations for this channel group.
                 continue
@@ -752,7 +745,7 @@ def doAvailability(
         avFilesDictionary,
         services_used,
         availabilityType,
-        availability_exists,
+        availability_exists_by_service,
     )
 
 
@@ -1185,7 +1178,7 @@ def doPDFs(
     network,
     stations,
     locations,
-    availabilityExists,
+    availabilityExistsByService,
 ):
     pdfDictionary = {}
 
@@ -1249,7 +1242,7 @@ def doPDFs(
                 startDate,
                 endDate,
                 tolerance,
-                availabilityExists,
+                availabilityExistsByService,
             )
 
             foundit = False
@@ -1322,7 +1315,7 @@ def doPDFs(
                 startDate,
                 endDate,
                 tolerance,
-                availabilityExists,
+                availabilityExistsByService,
             )
 
             foundit = False
@@ -1422,7 +1415,7 @@ def doSpectrograms(
     powerRanges,
     spectColorPalette,
     imageDir,
-    availabilityExists,
+    availabilityExistsByService,
 ):
     spectDictionary = {}  # used to track the plots to be used in the final report
 
@@ -1498,7 +1491,7 @@ def doSpectrograms(
                 startDate,
                 endDate,
                 tolerance,
-                availabilityExists,
+                availabilityExistsByService,
             )
 
             foundit = False
@@ -1570,7 +1563,7 @@ def doSpectrograms(
                 startDate,
                 endDate,
                 tolerance,
-                availabilityExists,
+                availabilityExistsByService,
             )
 
             foundit = False
@@ -1747,7 +1740,6 @@ def doReport(
     spectColorPalette,
     powerRanges,
     userDefinedPowerRange,
-    availabilityExists,
 ):
     print(f"INFO: Writing to file {outfile}")
 
@@ -1797,8 +1789,11 @@ def doReport(
     #     stationServiceLink = f'<a href="http://service.earthscope.org/{service}/station/1/" target="_blank">{service}-station service</a>,'
     #     availabilityServiceLink = f'<a href="http://service.earthscope.org/{service}/availability/1/" target="_blank">{service}-availability service</a>,'
     # stationServiceLink = f"{stationServiceLink[:-1]}"
-    if availabilityExists:
-        availabilityServiceLink = f'<a href="http://service.earthscope.org/fdsnws/availability/1/" target="_blank">fdsnws-availability service</a>'
+    if services:
+        availabilityServiceLink = " and ".join(
+            f'<a href="http://service.earthscope.org/{service}/availability/1/" target="_blank">{service}-availability service</a>'
+            for service in services
+        )
     else:
         availabilityServiceLink = f'<a href="http://service.earthscope.org/mustang/measurements/1/" target="_blank">mustang service</a>'
     stationServiceLink = f'<a href="http://service.earthscope.org/fdsnws/station/1/" target="_blank">fdsnws-station service</a>'
@@ -1848,10 +1843,10 @@ def doReport(
             f"{availabilityIntroText} <br/>Displaying all stations in the network.<br/>"
         )
 
-    if not availabilityExists:
+    if not services:
         availabilityIntroText = (
             f"{availabilityIntroText} <br/><br/>"
-            f"<b>Note:</b> the fdsnws-availability service was unavailable when this report was generated, "
+            f"<b>Note:</b> the availability service was unavailable when this report was generated, "
             f"so the data-extent and gap plot(s) below could not be produced. Station selection above was "
             f"still based on percent-availability metrics from MUSTANG.<br/>"
         )
@@ -2828,7 +2823,7 @@ def main():
         avFilesDictionary,
         services,
         availabilityType,
-        availabilityExists,
+        availabilityExistsByService,
     ] = doAvailability(
         splitPlots,
         startDate,
@@ -2881,7 +2876,7 @@ def main():
         network,
         stations,
         locations,
-        availabilityExists,
+        availabilityExistsByService,
     )
 
     # Create Spectrogram Plots
@@ -2897,7 +2892,7 @@ def main():
         powerRanges,
         spectColorPalette,
         imageDir,
-        availabilityExists,
+        availabilityExistsByService,
     )
 
     # Generate Station Map
@@ -2945,7 +2940,6 @@ def main():
         spectColorPalette,
         powerRanges,
         userDefinedPowerRange,
-        availabilityExists,
     )
 
     # Zip the report
