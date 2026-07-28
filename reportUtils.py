@@ -115,7 +115,7 @@ def getAvailability(snclqs, startDate, endDate, tolerance, avtype):
                 services.append(service)
 
             URL = (
-                f"http://service.iris.edu/{service}/availability/1/query?format=text&"
+                f"http://service.earthscope.org/{service}/availability/1/query?format=text&"
                 f"net={n}&sta={s}&loc={luse}&cha={c}&quality={q}&"
                 f"starttime={startDate}&endtime={endDate}&orderby=nslc_time_quality_samplerate&"
                 f"mergegaps={tolerance}&includerestricted=true&nodata=404"
@@ -153,7 +153,7 @@ def getAvailability(snclqs, startDate, endDate, tolerance, avtype):
             services.append(service)
 
         URL = (
-            f"http://service.iris.edu/{service}/availability/1/extent?format=text&"
+            f"http://service.earthscope.org/{service}/availability/1/extent?format=text&"
             f"net={nets}&sta={stas}&loc={locs}&cha={chans}&quality={qs}&"
             f"starttime={startDate}&endtime={endDate}&orderby=nslc_time_quality_samplerate&"
             f"includerestricted=true&nodata=404"
@@ -191,7 +191,7 @@ def getAvailability(snclqs, startDate, endDate, tolerance, avtype):
                     services.append(service)
 
                 URL = (
-                    f"http://service.iris.edu/{service}/availability/1/extent?format=text&"
+                    f"http://service.earthscope.org/{service}/availability/1/extent?format=text&"
                     f"net={n}&sta={s}&loc={luse}&cha={c}&quality={q}&"
                     f"starttime={startDate}&endtime={endDate}&orderby=nslc_time_quality_samplerate&"
                     f"&includerestricted=true&nodata=404"
@@ -329,7 +329,7 @@ def addMetricToDF(
         chanList.append(chan)
 
     URL = (
-        f"http://service.iris.edu/mustang/measurements/1/query?metric={metric}&net={network}&"
+        f"http://service.earthscope.org/mustang/measurements/1/query?metric={metric}&net={network}&"
         f"sta={stations}&loc={locations}&chan={','.join(chanList)}"
         f"&format=text&timewindow={startDate},{endDate}&nodata=404"
     )
@@ -412,7 +412,7 @@ def getMetadata(network, stations, locations, channels, startDate, endDate, leve
         # Call Fed Catalog to know what service the network can be retrieved using.
         print("        Calling on Fed Catalog")
         fedURL = (
-            f"http://service.iris.edu/irisws/fedcatalog/1/query?"
+            f"http://service.earthscope.org/irisws/fedcatalog/1/query?"
             f"net={network}&sta={stations}&loc={locations}&cha={','.join(chanList)}&"
             f"starttime={startDate}&endtime={endDate}"
             f"&format=request&includeoverlaps=false"
@@ -435,8 +435,8 @@ def getMetadata(network, stations, locations, channels, startDate, endDate, leve
                 % (fedURL, e)
             )
             services = [
-                "http://service.iris.edu/fdsnws/station/1/",
-                "http://service.iris.edu/ph5ws/station/1/",
+                "http://service.earthscope.org/fdsnws/station/1/",
+                "http://service.earthscope.org/ph5ws/station/1/",
             ]
 
         for service in services:
@@ -501,7 +501,7 @@ def retrieveExpectedPDFs(NSLC, startDate, endDate):
     sta = NSLC.split(".")[1]
     loc = NSLC.split(".")[2]
     cha = f"{NSLC.split('.')[3]}?"
-    URL = f"http://service.iris.edu/mustang/noise-pdf-browser/1/availability?network={net}&station={sta}&location={loc}&channel={cha}&starttime={startDate}&endtime={endDate}&interval=all"
+    URL = f"http://service.earthscope.org/mustang/noise-pdf-browser/1/availability?network={net}&station={sta}&location={loc}&channel={cha}&starttime={startDate}&endtime={endDate}&interval=all"
 
     response = SESSION.get(URL)
     if response.text.startswith("Error"):
@@ -543,7 +543,7 @@ def getPDF(target, startDate, endDate, spectPowerRange, imageDir):
     )
 
     URL = (
-        f"http://service.iris.edu/mustang/noise-pdf/1/query?&"
+        f"http://service.earthscope.org/mustang/noise-pdf/1/query?&"
         f"network={net}&station={sta}&location={loc}&channel={cha}&quality=?&"
         f"starttime={startDate}&endtime={endDate}&format=plot&plot.interpolation=bicubic&nodata=404&"
         f"plot.power.min={spectPowerRange[0]}&plot.power.max={spectPowerRange[1]}&{plotArguments}"
@@ -573,7 +573,7 @@ def getSpectrogram(
     )
 
     URL = (
-        f"http://service.iris.edu/mustang/noise-spectrogram/1/query?target={target}&"
+        f"http://service.earthscope.org/mustang/noise-spectrogram/1/query?target={target}&"
         f"starttime={startDate}&endtime={endDate}&output=power&format=plot&plot.color.palette={spectColorPalette}&"
         f"plot.powerscale.range={powerRange}&plot.horzaxis=time&plot.time.matchrequest=true&{plotArguments}&"
         f"plot.time.tickunit=auto&plot.time.invert=false&plot.powerscale.show=true&plot.powerscale.orientation=horz&nodata=404"

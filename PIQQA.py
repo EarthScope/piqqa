@@ -1772,7 +1772,7 @@ def doReport(
         f"This report is intended as a quick, broad overview of the quality of the data archived for the network "
         f"and time period specified above. IRIS' goal in generating these reports is to give PIs for temporary "
         f"experiments better insight into the quality of their data archived at the DMC, as well as to demonstrate "
-        f'the utility provided by the IRIS DMC quality assurance system <a href="http://service.iris.edu/mustang/?" target="_blank">MUSTANG</a> '
+        f'the utility provided by the IRIS DMC quality assurance system <a href="http://service.earthscope.org/mustang/?" target="_blank">MUSTANG</a> '
         f"and the many metrics and products it generates. "
         f"For PIs, we hope that these reports will "
         f"inform the range of data availability, continuity, and noise levels existing across the network and potentially "
@@ -1794,8 +1794,8 @@ def doReport(
 
     ###### AVAILABILITY ######
     # for service in services:
-    #     stationServiceLink = f'<a href="http://service.iris.edu/{service}/station/1/" target="_blank">{service}-station service</a>,'
-    #     availabilityServiceLink = f'<a href="http://service.iris.edu/{service}/availability/1/" target="_blank">{service}-availability service</a>,'
+    #     stationServiceLink = f'<a href="http://service.earthscope.org/{service}/station/1/" target="_blank">{service}-station service</a>,'
+    #     availabilityServiceLink = f'<a href="http://service.earthscope.org/{service}/availability/1/" target="_blank">{service}-availability service</a>,'
     # stationServiceLink = f"{stationServiceLink[:-1]}"
     if availabilityExists:
         availabilityServiceLink = (
@@ -1818,7 +1818,7 @@ def doReport(
         f"are from the IRIS DMC  {availabilityServiceLink}. "
         f"The gap tolerance used for this report is {tolerance} seconds.<br/><br/> "
         f"In addition, each channel lists the percent of data available, using the "
-        f'<a href="http://service.iris.edu/mustang/metrics/docs/1/desc/{availabilityType}/" '
+        f'<a href="http://service.earthscope.org/mustang/metrics/docs/1/desc/{availabilityType}/" '
         f'target="_blank">{availabilityType}</a> metric'
     )  # the punctuation at the end of this sentence depends on the metric
 
@@ -1855,7 +1855,7 @@ def doReport(
 
         for service in services:
             serviceLink = (
-                f"http://service.iris.edu/{service}/availability/1/query?format=text&"
+                f"http://service.earthscope.org/{service}/availability/1/query?format=text&"
                 f'net={network}&sta={stations}&loc={locations}&cha={",".join(chans)}&'
                 f"starttime={startDate}&endtime={endDate}&orderby=nslc_time_quality_samplerate&"
                 f"mergegaps={tolerance}&includerestricted=true&nodata=404"
@@ -1867,7 +1867,7 @@ def doReport(
 
         for service in services:
             serviceLink = (
-                f"http://service.iris.edu/{service}/station/1/query?"
+                f"http://service.earthscope.org/{service}/station/1/query?"
                 f'net={network}&sta={stations}&loc={locations}&cha={",".join(chans)}&'
                 f"starttime={startDate}&endtime={endDate}&level=channel&"
                 f"format=text&includecomments=true&nodata=404"
@@ -1882,7 +1882,7 @@ def doReport(
     defaultMetricText = "The metrics presented here are"
     for metric in metricList:
         defaultMetricText = (
-            f'{defaultMetricText} <a href="http://service.iris.edu/mustang/metrics/docs/1/desc/{metric}/" '
+            f'{defaultMetricText} <a href="http://service.earthscope.org/mustang/metrics/docs/1/desc/{metric}/" '
             f'target="_blank">{metric}</a>,'
         )
         if metric == metricList[-2]:
@@ -1975,15 +1975,15 @@ def doReport(
     for metric in metricsWithPlots:
         if metric == "scale_corrected_sample_rms":
             metric = "sample_rms"
-        boxPlotIntroText3 = f'{boxPlotIntroText3}<li><a href="http://service.iris.edu/mustang/metrics/docs/1/desc/{metric}" target="_blank">{metric}</a></li>\n'
+        boxPlotIntroText3 = f'{boxPlotIntroText3}<li><a href="http://service.earthscope.org/mustang/metrics/docs/1/desc/{metric}" target="_blank">{metric}</a></li>\n'
 
     boxPlotIntroText3 = f"{boxPlotIntroText3} </ul>"
 
     ###### PDFS ######
     pdfPlotIntroText = (
         f"<p>This section contains Probability Density Function (PDF) plots calculated from Power Spectral Densities (PSD). The first two plots display PDFs "
-        f'for the stations with the highest and lowest median daily-RMS variance (<a href="http://service.iris.edu/mustang/metrics/docs/1/desc/sample_rms/" target="_blank">sample_rms</a>, scaled by metadata sensitivity), '
-        f'with an additional criteria that omits station-channels with less than 75% data availability (<a href="http://service.iris.edu/mustang/metrics/docs/1/desc/{availabilityType}/" '
+        f'for the stations with the highest and lowest median daily-RMS variance (<a href="http://service.earthscope.org/mustang/metrics/docs/1/desc/sample_rms/" target="_blank">sample_rms</a>, scaled by metadata sensitivity), '
+        f'with an additional criteria that omits station-channels with less than 75% data availability (<a href="http://service.earthscope.org/mustang/metrics/docs/1/desc/{availabilityType}/" '
         f'target="_blank">{availabilityType} metric</a>, '
         f"calculated between the first and last timestamp of the data for that channel), unless none of the stations have at least 75% availability. "
         f"These plots are intended to illustrate the range of characteristic noise levels across the experiment, avoiding stations with significant "
@@ -1991,7 +1991,7 @@ def doReport(
         f"errors. The third PDF is a composite plot of all stations for each channel set, giving an overview of the most common noise levels for the "
         f"experiment as a whole.</p>"
         f"<p>Detailed information about these PDF plots and how MUSTANG generates them "
-        f'can be found by visiting the <a href="http://service.iris.edu/mustang/noise-pdf/docs/1/help/" target="_blank">'
+        f'can be found by visiting the <a href="http://service.earthscope.org/mustang/noise-pdf/docs/1/help/" target="_blank">'
         f"noise-pdf web service</a>.</p>"
         f"Please note that you can also click the PDF Browser links below to access the MUSTANG PDF Browser, which allows you to view PDF plots "
         f"for all stations in the network on a total, annual, monthly, daily, or custom time period basis. Within the Browser, you can "
@@ -2002,7 +2002,7 @@ def doReport(
     spectrgramPlotIntoText = (
         f"<p>The daily-PDF-mode spectrogram plots in this section illustrate the power spectra values across time for two stations with high data "
         f"availability and continuity. For the purpose of showing potentially different station behavior, they are secondarily selected for "
-        f'differing median daily-RMS variance (<a href="http://service.iris.edu/mustang/metrics/docs/1/desc/sample_rms/" target="_blank">sample_rms</a> '
+        f'differing median daily-RMS variance (<a href="http://service.earthscope.org/mustang/metrics/docs/1/desc/sample_rms/" target="_blank">sample_rms</a> '
         f" metric, scaled by metadata sensitivity). For each channel group, the station selection steps are: "
         f"<ol>"
     )
@@ -2019,7 +2019,7 @@ def doReport(
     if splitPlots == 1:
         spectrgramPlotIntoText = (
             f"{spectrgramPlotIntoText}<li>Take the list of the {nTop} stations with the highest percent of data availability calculated over the entire requested "
-            f'report timespan (using <a href="http://service.iris.edu/mustang/metrics/docs/1/desc/{availabilityType}/" '
+            f'report timespan (using <a href="http://service.earthscope.org/mustang/metrics/docs/1/desc/{availabilityType}/" '
             f'target="_blank">{availabilityType}</a>, {spectAvailDescription}).</li>'
         )
     else:
@@ -2044,7 +2044,7 @@ def doReport(
 
     spectrgramPlotIntoText = (
         f"{spectrgramPlotIntoText}<p>Detailed information about these spectrogram plots and how MUSTANG "
-        f'generates them can be found by visiting the <a href="http://service.iris.edu/mustang/noise-spectrogram/'
+        f'generates them can be found by visiting the <a href="http://service.earthscope.org/mustang/noise-spectrogram/'
         f'docs/1/help/" target="_blank"> noise-spectrogram web service</a>.</p>'
         f"<p>Please note that you can also click the Spectrogram Browser links below to access the MUSTANG spectrogram "
         f"browser for each channel group below, which allows you to view spectrogram plots from all the stations in your network.</p>"
@@ -2324,7 +2324,7 @@ def doReport(
             "<p>MUSTANG is the Quality Assurance system at the IRIS DMC. It contains around 45 metrics related to the quality of data in the archives there.\n\n"
         )
         f.write(
-            'The majority of metrics are available via the <a href="http://service.iris.edu/mustang/measurements/1/" target="_blank">measurements web service.</a>\n\n'
+            'The majority of metrics are available via the <a href="http://service.earthscope.org/mustang/measurements/1/" target="_blank">measurements web service.</a>\n\n'
         )
         f.write(
             'To learn more about the metrics, navigate to the measurements service Service Interface page and hit the red "Current List of all metrics" for a brief description and links to more detailed documentation.\n\n'
@@ -2343,7 +2343,7 @@ def doReport(
             if metric == "scale_corrected_sample_rms":
                 metric = "sample_rms"
             metricsLinks = (
-                f"http://service.iris.edu/mustang/measurements/1/query?metric={metric}"
+                f"http://service.earthscope.org/mustang/measurements/1/query?metric={metric}"
                 f"&network={network}&station={stations}&location={locations}&channel={channels}"
                 f"&start={startDate}&end={endDate}&format=text"
             )
@@ -2381,7 +2381,7 @@ def doReport(
                 nStations = 1
 
             pdfLink = (
-                f"http://service.iris.edu/mustang/noise-pdf-browser/1/gallery?"
+                f"http://service.earthscope.org/mustang/noise-pdf-browser/1/gallery?"
                 f"network={network}&channel={channel[0:2]}?&interval=all&"
                 f"starttime={startDate}&endtime={endDate}"
             )
@@ -2468,7 +2468,7 @@ def doReport(
                 spectPowerRange = ",".join([str(int) for int in userDefinedPowerRange])
 
             spectLink = (
-                f"http://service.iris.edu/mustang/noise-pdf-browser/1/spectrogram?"
+                f"http://service.earthscope.org/mustang/noise-pdf-browser/1/spectrogram?"
                 f"network={network}&channel={channel[0:2]}?&"
                 f"starttime={startDate}&endtime={endDate}&color.palette={spectColorPalette}&powerrange={spectPowerRange}"
             )
@@ -2644,7 +2644,7 @@ def main():
         --metric[s]=: comma-separated list of metrics to run for the boxplots; defaults: {','.join(metricList)}
         --maxplot=: number of stations to include in the boxplots; defaults to {nBoxPlotSta}
         --colorpalette=: color palette for spectrograms; defaults to '{spectColorPalette}'
-            options available at http://service.iris.edu/mustang/noise-spectrogram/1/
+            options available at http://service.earthscope.org/mustang/noise-spectrogram/1/
         --includeoutliers=: whether to include outliers in the boxplots, True/False; defaults to {includeOutliers}
         --spectralrange=: power range to use in the PDFs and spectrograms, comma separated values:  min,max; defaults depend on channel type
         --basemap=: the name of the basemap to be used for the map; defaults to '{basemap}'
