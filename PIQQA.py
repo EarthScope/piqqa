@@ -1815,7 +1815,7 @@ def doReport(
         f"<br/><br/>"
         f"The report will include selected channels if specified, or all available channels if not. To see the complete metadata holdings for this experiment, visit this link:"
         f'<p><a href="http://ds.iris.edu/mda/{network}/?starttime={startDate}T00:00:00&endtime={endDate}T23:59:59" target="_blank"> '
-        f"IRIS Metadata Aggregator (MDA) for {network}: {startDate} to {endDate}</a></p>\n"
+        f"EarthScope Metadata Aggregator (MDA) for {network}: {startDate} to {endDate}</a></p>\n"
     )
 
     ###### AVAILABILITY ######
