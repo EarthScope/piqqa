@@ -1880,7 +1880,7 @@ def doReport(
     if not services:
         availabilityIntroText = (
             f"{availabilityIntroText} <br/><br/>"
-            f"<b>Note:</b> the availability service was unavailable when this report was generated, "
+            f"<b>Note:</b> the EarthScope availability service was unavailable when this report was generated, "
             f"so the data-extent and gap plot(s) below could not be produced. Station selection above was "
             f"still based on percent-availability metrics from MUSTANG.<br/>"
         )
