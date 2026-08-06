@@ -1,7 +1,7 @@
 # PIQQA
 The PI's Quick Quality Assessment   
 
-PIQQA is python utility to create a simple Quality Assurance report. Developed by EarthScope, this tool is intended for use by the the EarthScope Primary Instrument Center (EPIC), meant to generate an easy-to-digest QA report for PIs after their experiment wraps.
+PIQQA is python utility to create a simple Quality Assurance report. Developed by EarthScope (formerly IRIS DMC), this tool is intended for use by the the EarthScope Primary Instrument Center (EPIC), meant to generate an easy-to-digest QA report for PIs after their experiment wraps.
 
 The command-line utility retrieves MUSTANG metrics, PDFs, and spectrograms, as well as metadata from the EarthScope station service, putting them all together in a report.
 
