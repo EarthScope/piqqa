@@ -1797,7 +1797,7 @@ def doReport(
     introText = (
         f"This report is intended as a quick, broad overview of the quality of the data archived for the network "
         f"and time period specified above. EarthScope's goal in generating these reports is to give PIs for temporary "
-        f"experiments better insight into the quality of their data archived at the DMC, as well as to demonstrate "
+        f"experiments better insight into the quality of their data archived at EarthScope, as well as to demonstrate "
         f'the utility provided by the EarthScope quality assurance system <a href="http://service.earthscope.org/mustang/?" target="_blank">MUSTANG</a> '
         f"and the many metrics and products it generates. "
         f"For PIs, we hope that these reports will "
