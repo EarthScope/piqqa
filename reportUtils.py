@@ -93,7 +93,8 @@ def mergeGapsWithinTolerance(availabilityDF, tolerance):
     """Merge adjacent time spans (per network/station/location/channel/quality) that are
     separated by a gap no larger than `tolerance` seconds. The availability service used
     to do this server-side via the mergegaps parameter; the migrated service no longer
-    honors it, so this reproduces the same gap-tolerance behavior client-side instead."""
+    honors it, so this reproduces the same gap-tolerance behavior client-side instead.
+    """
     if availabilityDF.empty:
         return availabilityDF
 
@@ -343,11 +344,7 @@ def checkTsMetricsExist(startDate, endDate, timeout=15):
     # Probe against a long-running reference station (IU.ANMO) rather than the
     # network being reported on, so the result reflects whether ts_ metrics exist
     # at all rather than whether this particular network has data for them.
-    testURL = (
-        f"https://service.earthscope.org/mustang/measurements/1/query?"
-        f"metric=ts_percent_availability_total&net=IU&sta=ANMO&loc=00&chan=BHZ&"
-        f"format=text&timewindow={startDate},{endDate}&nodata=404"
-    )
+    testURL = "https://service.earthscope.org/mustang/metrics/1/query?metric=ts_percent_availability_total&output=html&nodata=404"
     try:
         response = SESSION.get(testURL, timeout=timeout)
         if "Could not find metric" in response.text:
@@ -417,7 +414,7 @@ def addMetricToDF(
 
 
 def serviceForQuality(quality):
-    # PH5/PASSCAL data (quality "D") is served by ph5ws (service.iris.edu), while
+    # PH5 data (quality "D") is served by ph5ws (service.earthscope.org), while
     # regular FDSN data (quality "M") is served by fdsnws (service.earthscope.org) -
     # these can go down independently of each other.
     return "ph5ws" if quality == "D" else "fdsnws"
@@ -465,7 +462,7 @@ def getAvailabilityServiceURLs(
         # Fall back to checking both - each is probed independently, so this is conservative, not incorrect.
         serviceURLs = {
             "fdsnws": "https://service.earthscope.org/fdsnws/availability/1/",
-            "ph5ws": "http://service.iris.edu/ph5ws/availability/1/",
+            "ph5ws": "http://service.earthscope.org/ph5ws/availability/1/",
         }
 
     return serviceURLs
@@ -489,7 +486,7 @@ def checkAvailabilityServicesExist(
         except urllib.error.HTTPError as e:
             if e.code == 410:
                 print(
-                    f"WARNING: {serviceKey}-availability service is down, falling back to MUSTANG percent_availability for data extents"
+                    f"WARNING: {serviceKey}-availability service is gone, falling back to MUSTANG percent_availability for data extents"
                 )
             else:
                 print(
