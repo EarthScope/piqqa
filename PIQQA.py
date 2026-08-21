@@ -24,7 +24,7 @@ under the License.
 
 """
 
-version = "v1.0.2"
+version = "v1.1.0"
 
 import reportUtils
 import pandas as pd
@@ -42,18 +42,26 @@ import math
 
 
 def checkAvailability(
-    thisNetwork, thisStation, thisLocation, thisChannel, thisStart, thisEnd
+    thisNetwork,
+    thisStation,
+    thisLocation,
+    thisChannel,
+    thisStart,
+    thisEnd,
+    tsMetricsExist,
 ):
-    thisAvDF = reportUtils.addMetricToDF(
-        "ts_percent_availability_total",
-        pd.DataFrame(),
-        thisNetwork,
-        thisStation,
-        thisLocation,
-        thisChannel,
-        thisStart,
-        thisEnd,
-    )
+    thisAvDF = pd.DataFrame()
+    if tsMetricsExist:
+        thisAvDF = reportUtils.addMetricToDF(
+            "ts_percent_availability_total",
+            pd.DataFrame(),
+            thisNetwork,
+            thisStation,
+            thisLocation,
+            thisChannel,
+            thisStart,
+            thisEnd,
+        )
 
     if thisAvDF.empty:
         # need to round out the start and end times for non-ts_percent_availability_total, in case it's very short
@@ -103,7 +111,7 @@ def checkAvailability(
     except:
         thisPctAvail = 0
         print(
-            f"**** WARNING: No Percent Availability found for {thisNetwork.thisStation.thisLocation.thisChannel} - are services down? ****"
+            f"**** WARNING: No Percent Availability found for {thisNetwork}.{thisStation}.{thisLocation}.{thisChannel} - are services down? ****"
         )
 
     return thisPctAvail
@@ -125,7 +133,14 @@ def doAvailability(
     nBottom,
     tolerance,
     imageDir,
+    tsMetricsExist,
 ):
+    # Test whether the availability service(s) relevant to this network are up (fdsnws-availability
+    # and ph5ws-availability can go down independently of each other); if not, fall back to
+    # MUSTANG percent_availability extents (no gap-level detail) rather than skipping the plot
+    availability_exists_by_service = reportUtils.checkAvailabilityServicesExist(
+        network, stations, locations, channels, startDate, endDate
+    )
 
     print("INFO: Producing availability plot")
     avFilesDictionary = {}  # collects plot filenames
@@ -152,7 +167,7 @@ def doAvailability(
         actualChannels = sorted(list(set(allMetadataDF["channel"])))
     except:
         quit(
-            "\nQUITTING: No information found for network and times, is something wrong? Is there data at IRIS for this network? Does this network have channels with the Z component?"
+            "\nQUITTING: No information found for network and times, is something wrong? Is there data at EarthScope for this network? Does this network have channels with the Z component?"
         )
 
     ## Loop over the channel groups
@@ -162,30 +177,32 @@ def doAvailability(
         tmpMetadataDF = allMetadataDF[allMetadataDF["channel"] == channelGroup]
 
         ## Get percent availability numbers for all targets for this channelGroup so that you can narrow it down to the top/bottom available
-        # First try to use ts_percent_availability_total
+        # First try to use ts_percent_availability_total, unless we already know ts_ metrics are down
         pctAvDF = pd.DataFrame()
 
-        print(
-            f"    INFO: Retrieving percent availability information for {channelGroup}"
-        )
-        try:
-            pctAvDF = reportUtils.addMetricToDF(
-                "ts_percent_availability_total",
-                pctAvDF,
-                network,
-                stations,
-                locations,
-                channelGroup,
-                startDate,
-                endDate,
+        if tsMetricsExist:
+            print(
+                f"    INFO: Retrieving percent availability information for {channelGroup}"
             )
-        except:
-            print(f"ERROR: Trouble accessing ts_percent_availability_total")
+            try:
+                pctAvDF = reportUtils.addMetricToDF(
+                    "ts_percent_availability_total",
+                    pctAvDF,
+                    network,
+                    stations,
+                    locations,
+                    channelGroup,
+                    startDate,
+                    endDate,
+                )
+            except:
+                print(f"ERROR: Trouble accessing ts_percent_availability_total")
 
-        if not pctAvDF.empty:
-            pctAvDF.rename(
-                columns={"ts_percent_availability_total": "availability"}, inplace=True
-            )
+            if not pctAvDF.empty:
+                pctAvDF.rename(
+                    columns={"ts_percent_availability_total": "availability"},
+                    inplace=True,
+                )
 
         # If not all targets have ts_percent_availability_total, then try getting it from percent_availability
 
@@ -259,11 +276,34 @@ def doAvailability(
         )  # Only used to get the number of stations, the list isn't actually used otherwise
         nsta = len(stationList)
 
+        # Determine which availability service(s) this channel group's targets actually need
+        # (fdsnws and/or ph5ws), and only draw the extents/gaps plot if all of them are up.
+        relevantServices = {
+            reportUtils.serviceForQuality(s.split(".")[-1]) for s in pctAvDF["snclq"]
+        }
+        channelGroupAvailabilityExists = all(
+            availability_exists_by_service.get(svc, False) for svc in relevantServices
+        )
+
         if nsta > nBoxPlotSta:
             splitPlots = 1
 
             topStations = pctAvDF.iloc[:nTop, :]
             bottomStations = pctAvDF.iloc[-nBottom:, :]
+
+            # Station selection only needs MUSTANG percent-availability data, so this stays
+            # populated (for PDFs/Spectrograms downstream) even if the availability service is down.
+            try:
+                topStationList = topStations["station"].tolist()
+            except:
+                topStationList = tmpMetadataDF["station"].tolist()[:nTop]
+
+            topStationsDict[channelGroup] = topStationList
+
+            if not channelGroupAvailabilityExists:
+                # Can't draw the extents/gaps plot without the availability service - skip the plot,
+                # but topStationsDict above still lets PDFs/Spectrograms pick stations for this channel group.
+                continue
 
             height = max(min(0.3 * nsta, 0.3 * nBoxPlotSta), 2)
             width = 15
@@ -284,17 +324,10 @@ def doAvailability(
                 if service not in services_used:
                     services_used.append(service)
 
-            try:
-                topStationList = topStations["station"].tolist()
-            except:
-                topStationList = tmpMetadataDF["station"].tolist()[:nTop]
-
             topLabels = [
                 f"{a} ({b:.3f}%)"
                 for a, b in zip(topStations["station"], topStations["availability"])
             ]
-
-            topStationsDict[channelGroup] = topStationList
 
             datalines = []
             metadatalines = []
@@ -405,6 +438,7 @@ def doAvailability(
             bottomStationsAvDF, services = reportUtils.getAvailability(
                 bottomStations["snclq"], startDate, endDate, tolerance, ""
             )
+
             for service in services:
                 if service not in services_used:
                     services_used.append(service)
@@ -422,7 +456,6 @@ def doAvailability(
 
             stn = 0
             for station in bottomStationList:
-
                 # data extents and gaps extents
                 if (
                     not bottomStations[
@@ -516,7 +549,7 @@ def doAvailability(
             ax2.add_collection(GapLines)
             ax2.autoscale()
             ax2.invert_yaxis()
-            ax2.set_yticks(np.arange(nTop))
+            ax2.set_yticks(np.arange(nBottom))
             ax2.set_yticklabels(bottomLabels)
             ax2.set_xlim(
                 [mpl.dates.datestr2num(startDate), mpl.dates.datestr2num(endDate)]
@@ -553,6 +586,13 @@ def doAvailability(
 
             ## Then repeat for the case where they aren't broken up by top/bottom
         else:
+            allStationList = pctAvDF["station"].tolist()
+            topStationsDict[channelGroup] = allStationList
+
+            if not channelGroupAvailabilityExists:
+                # Can't draw the extents/gaps plot without the availability service - skip the plot,
+                # but topStationsDict above still lets PDFs/Spectrograms pick stations for this channel group.
+                continue
 
             height = max(min(0.3 * nsta, 0.3 * nBoxPlotSta), 2)
             width = 15
@@ -565,12 +605,10 @@ def doAvailability(
                 if service not in services_used:
                     services_used.append(service)
 
-            allStationList = pctAvDF["station"].tolist()
             allLabels = [
                 f"{a} ({b:.3f}%)"
                 for a, b in zip(pctAvDF["station"], pctAvDF["availability"])
             ]
-            topStationsDict[channelGroup] = allStationList
 
             datalines = []
             metadatalines = []
@@ -715,6 +753,7 @@ def doAvailability(
         avFilesDictionary,
         services_used,
         availabilityType,
+        availability_exists_by_service,
     )
 
 
@@ -736,10 +775,17 @@ def doBoxPlots(
     nBottom,
     includeOutliers,
     imageDir,
+    tsMetricsExist,
 ):
     # Retrieve metrics from mustang service
     print("INFO: Generating Boxplots")
     print("    INFO: Retrieving metrics from the MUSTANG webservices...")
+    if not tsMetricsExist:
+        if "ts_num_gaps_total" in metricList:
+            metricList.remove("ts_num_gaps_total")
+        if "ts_num_gaps" in metricList:
+            metricList.remove("ts_num_gaps")
+            metricList.append("num_gaps")
     metricsWithPlots = list()
 
     metricDF = pd.DataFrame()
@@ -820,7 +866,7 @@ def doBoxPlots(
                         if tmpDF.empty:
                             tmpDF = thisDF.copy()
                         else:
-                            tmpDF = tmpDF.append(thisDF, ignore_index=True)
+                            tmpDF = pd.concat([tmpDF, thisDF], ignore_index=True)
 
                     columnsToKeep = [
                         "snclq",
@@ -931,7 +977,7 @@ def doBoxPlots(
             print(f"    INFO: Generating Boxplots for {channelGroup}")
 
             tmpDF = scaledDF[scaledDF["target"].str.endswith(channelGroup)]
-            grouped = tmpDF.groupby(["station"])
+            grouped = tmpDF.groupby("station")
 
             filenames = list()
             for metric in metricList:
@@ -1140,6 +1186,8 @@ def doPDFs(
     network,
     stations,
     locations,
+    availabilityExistsByService,
+    tsMetricsExist,
 ):
     pdfDictionary = {}
 
@@ -1157,7 +1205,7 @@ def doPDFs(
         # Use the dataframe with the SCALED sample_rms to determine the top/bottom station/target
         tmpDF = scaledDF[scaledDF["target"].str.endswith(channelGroup)]
 
-        grouped = tmpDF.groupby(["snclq"])
+        grouped = tmpDF.groupby("snclq")
 
         try:
             df2 = pd.DataFrame(
@@ -1194,28 +1242,33 @@ def doPDFs(
             thisChannel = lowestTarget.split(".")[3]
 
             # Check the availablity service to get the start and end to the data
-            thisStationAvDF, service = reportUtils.getAvailability(
-                [lowestTarget], startDate, endDate, tolerance, ""
+            thisStart, thisEnd = reportUtils.getDataStartEnd(
+                lowestTarget,
+                thisNetwork,
+                thisStation,
+                thisLocation,
+                thisChannel,
+                startDate,
+                endDate,
+                tolerance,
+                availabilityExistsByService,
             )
-            thisAvail = thisStationAvDF[
-                (thisStationAvDF["station"] == thisStation)
-                & (thisStationAvDF["network"] == thisNetwork)
-                & (thisStationAvDF["location"] == thisLocation)
-                & (thisStationAvDF["channel"] == thisChannel)
-            ]
 
-            thisStart = thisAvail["earliest"].dt.strftime("%Y-%m-%dT%H:%M:%S").min()
-            thisEnd = thisAvail["latest"].dt.strftime("%Y-%m-%dT%H:%M:%S").max()
-
+            foundit = False
             print(
                 f"        INFO: Checking percent availability for {thisNetwork}.{thisStation}.{thisLocation}.{thisChannel} to see if there is as least 75% availability"
             )
             # get the ts_percent_availatility_total (or percent_availability if ph5) for the time between the data start and end.
             thisPctAvail = checkAvailability(
-                thisNetwork, thisStation, thisLocation, thisChannel, thisStart, thisEnd
+                thisNetwork,
+                thisStation,
+                thisLocation,
+                thisChannel,
+                thisStart,
+                thisEnd,
+                tsMetricsExist,
             )
 
-            foundit = False
             if thisPctAvail > 75:
                 # Then we can use it and break the cycle.
                 foundit = True
@@ -1268,28 +1321,33 @@ def doPDFs(
             thisChannel = largestTarget.split(".")[3]
 
             # Get start and end to the data for this target
-            thisStationAvDF, service = reportUtils.getAvailability(
-                [largestTarget], startDate, endDate, tolerance, ""
+            thisStart, thisEnd = reportUtils.getDataStartEnd(
+                largestTarget,
+                thisNetwork,
+                thisStation,
+                thisLocation,
+                thisChannel,
+                startDate,
+                endDate,
+                tolerance,
+                availabilityExistsByService,
             )
-            thisAvail = thisStationAvDF[
-                (thisStationAvDF["station"] == thisStation)
-                & (thisStationAvDF["network"] == thisNetwork)
-                & (thisStationAvDF["location"] == thisLocation)
-                & (thisStationAvDF["channel"] == thisChannel)
-            ]
 
-            thisStart = thisAvail["earliest"].dt.strftime("%Y-%m-%dT%H:%M:%S").min()
-            thisEnd = thisAvail["latest"].dt.strftime("%Y-%m-%dT%H:%M:%S").max()
-
+            foundit = False
             print(
                 f"        INFO: Checking percent availability for {thisNetwork}.{thisStation}.{thisLocation}.{thisChannel} to see if there is as least 75% availability"
             )
             # get the percent availability between the start and end times of the data
             thisPctAvail = checkAvailability(
-                thisNetwork, thisStation, thisLocation, thisChannel, thisStart, thisEnd
+                thisNetwork,
+                thisStation,
+                thisLocation,
+                thisChannel,
+                thisStart,
+                thisEnd,
+                tsMetricsExist,
             )
 
-            foundit = False
             if thisPctAvail > 75:
                 # Needs to have >75% and not be the same target that we've already selected for lowest RMS
                 # Then we can use it and break the cycle.  Otherwise break with foundit still = False so it will use the original choice
@@ -1378,6 +1436,8 @@ def doSpectrograms(
     powerRanges,
     spectColorPalette,
     imageDir,
+    availabilityExistsByService,
+    tsMetricsExist,
 ):
     spectDictionary = {}  # used to track the plots to be used in the final report
 
@@ -1406,7 +1466,7 @@ def doSpectrograms(
         ]
 
         # Select the lowest and greatest rms from those stations
-        grouped = tmpDF.groupby(["snclq"])
+        grouped = tmpDF.groupby("snclq")
 
         try:
             df2 = pd.DataFrame(
@@ -1444,28 +1504,33 @@ def doSpectrograms(
             thisChannel = lowestTarget.split(".")[3]
 
             # Get the start and end to the data for this target
-            thisStationAvDF, service = reportUtils.getAvailability(
-                [lowestTarget], startDate, endDate, tolerance, ""
+            thisStart, thisEnd = reportUtils.getDataStartEnd(
+                lowestTarget,
+                thisNetwork,
+                thisStation,
+                thisLocation,
+                thisChannel,
+                startDate,
+                endDate,
+                tolerance,
+                availabilityExistsByService,
             )
-            thisAvail = thisStationAvDF[
-                (thisStationAvDF["station"] == thisStation)
-                & (thisStationAvDF["network"] == thisNetwork)
-                & (thisStationAvDF["location"] == thisLocation)
-                & (thisStationAvDF["channel"] == thisChannel)
-            ]
 
-            thisStart = thisAvail["earliest"].dt.strftime("%Y-%m-%dT%H:%M:%S").min()
-            thisEnd = thisAvail["latest"].dt.strftime("%Y-%m-%dT%H:%M:%S").max()
-
+            foundit = False
             print(
                 f"        INFO: Checking percent availability for {thisNetwork}.{thisStation}.{thisLocation}.{thisChannel} to see if there is as least 75% availability"
             )
             # Get the percent availability between the start and end for this target
             thisPctAvail = checkAvailability(
-                thisNetwork, thisStation, thisLocation, thisChannel, thisStart, thisEnd
+                thisNetwork,
+                thisStation,
+                thisLocation,
+                thisChannel,
+                thisStart,
+                thisEnd,
+                tsMetricsExist,
             )
 
-            foundit = False
             if thisPctAvail > 75:
                 # Then we can use it and break the cycle.
                 foundit = True
@@ -1503,7 +1568,7 @@ def doSpectrograms(
         spectDictionary[f"{channelGroup}_smallest"] = sorted(spectFiles)
 
         # 2. largest corrected sample_rms station
-        print("    INFO: Searching for lowest corrected sample_rms station")
+        print("    INFO: Searching for highest corrected sample_rms station")
         for ii in reversed(range(len(meds.index))):
             largestTarget = meds.index[ii]
             largestNSL = largestTarget[:-3]
@@ -1517,28 +1582,33 @@ def doSpectrograms(
             thisChannel = largestTarget.split(".")[3]
 
             # Get the start/end times of the data for this target
-            thisStationAvDF, service = reportUtils.getAvailability(
-                [largestTarget], startDate, endDate, tolerance, ""
+            thisStart, thisEnd = reportUtils.getDataStartEnd(
+                largestTarget,
+                thisNetwork,
+                thisStation,
+                thisLocation,
+                thisChannel,
+                startDate,
+                endDate,
+                tolerance,
+                availabilityExistsByService,
             )
-            thisAvail = thisStationAvDF[
-                (thisStationAvDF["station"] == thisStation)
-                & (thisStationAvDF["network"] == thisNetwork)
-                & (thisStationAvDF["location"] == thisLocation)
-                & (thisStationAvDF["channel"] == thisChannel)
-            ]
 
-            thisStart = thisAvail["earliest"].dt.strftime("%Y-%m-%dT%H:%M:%S").min()
-            thisEnd = thisAvail["latest"].dt.strftime("%Y-%m-%dT%H:%M:%S").max()
-
+            foundit = False
             print(
                 f"        INFO: Checking percent availability for {thisNetwork}.{thisStation}.{thisLocation}.{thisChannel} to see if there is as least 75% availability"
             )
             # Get the percent availability between the start and end times for this target
             thisPctAvail = checkAvailability(
-                thisNetwork, thisStation, thisLocation, thisChannel, thisStart, thisEnd
+                thisNetwork,
+                thisStation,
+                thisLocation,
+                thisChannel,
+                thisStart,
+                thisEnd,
+                tsMetricsExist,
             )
 
-            foundit = False
             if thisPctAvail > 75:
                 # Needs to have >75% and not be the same target that we've already selected for lowest RMS
                 # Then we can use it and break the cycle.  Otherwise break with foundit still = False so it will use the original choice
@@ -1726,13 +1796,13 @@ def doReport(
     ###### INTRO ######
     introText = (
         f"This report is intended as a quick, broad overview of the quality of the data archived for the network "
-        f"and time period specified above. IRIS' goal in generating these reports is to give PIs for temporary "
-        f"experiments better insight into the quality of their data archived at the DMC, as well as to demonstrate "
-        f'the utility provided by the IRIS DMC quality assurance system <a href="http://service.iris.edu/mustang/?" target="_blank">MUSTANG</a> '
+        f"and time period specified above. EarthScope's goal in generating these reports is to give PIs for temporary "
+        f"experiments better insight into the quality of their data archived at EarthScope, as well as to demonstrate "
+        f'the utility provided by the EarthScope quality assurance system <a href="http://service.earthscope.org/mustang/?" target="_blank">MUSTANG</a> '
         f"and the many metrics and products it generates. "
         f"For PIs, we hope that these reports will "
         f"inform the range of data availability, continuity, and noise levels existing across the network and potentially "
-        f"which stations are problematic and might be avoided for ongoing data analysis. For PASSCAL, these reports may provide lessons "
+        f"which stations are problematic and might be avoided for ongoing data analysis. For the EarthScope Primary Instrument Center (EPIC), these reports may provide lessons "
         f"on which field practices resulted in improved data quality and vice versa.  Armed with this "
         f"information, we hope that PIs will be better positioned to produce high quality data from future field activities."
         f"<br/><br/>"
@@ -1740,20 +1810,27 @@ def doReport(
         f"it is recommended that users may also benefit from a more thorough quality assurance inspection of the data, "
         f"according to their needs."
         f"<br/><br/>"
-        f"Data and metadata are stored at the IRIS DMC and the information here reflects the holdings in their archive. "
+        f"Data and metadata are stored at EarthScope and the information here reflects the holdings in their archive. "
         f"Quality metrics, Probability Density Functions (PDFs), and PDF-mode spectrograms are generated by MUSTANG."
         f"<br/><br/>"
         f"The report will include selected channels if specified, or all available channels if not. To see the complete metadata holdings for this experiment, visit this link:"
         f'<p><a href="http://ds.iris.edu/mda/{network}/?starttime={startDate}T00:00:00&endtime={endDate}T23:59:59" target="_blank"> '
-        f"IRIS Metadata Aggregator (MDA) for {network}: {startDate} to {endDate}</a></p>\n"
+        f"EarthScope Metadata Aggregator (MDA) for {network}: {startDate} to {endDate}</a></p>\n"
     )
 
     ###### AVAILABILITY ######
-    for service in services:
-        stationServiceLink = f'<a href="http://service.iris.edu/{service}/station/1/" target="_blank">{service}-station service</a>,'
-        availabilityServiceLink = f'<a href="http://service.iris.edu/{service}/availability/1/" target="_blank">{service}-availability service</a>,'
-    stationServiceLink = f"{stationServiceLink[:-1]}"
-    availabilityServiceLink = f"{availabilityServiceLink[:-1]}"
+    # for service in services:
+    #     stationServiceLink = f'<a href="http://service.earthscope.org/{service}/station/1/" target="_blank">{service}-station service</a>,'
+    #     availabilityServiceLink = f'<a href="http://service.earthscope.org/{service}/availability/1/" target="_blank">{service}-availability service</a>,'
+    # stationServiceLink = f"{stationServiceLink[:-1]}"
+    if services:
+        availabilityServiceLink = " and ".join(
+            f'<a href="http://service.earthscope.org/{service}/availability/1/" target="_blank">{service}-availability service</a>'
+            for service in services
+        )
+    else:
+        availabilityServiceLink = f'<a href="http://service.earthscope.org/mustang/measurements/1/" target="_blank">mustang service</a>'
+    stationServiceLink = f'<a href="http://service.earthscope.org/fdsnws/station/1/" target="_blank">fdsnws-station service</a>'
 
     availabilityIntroText = (
         f"The plot(s) below gives an overview of the available data for the requested timespan. "
@@ -1763,12 +1840,12 @@ def doReport(
         f"<li> Available data extents in blue </li>  "
         f"<li> Gaps in black  </li>"
         f"</ol>"
-        f"The metadata extents are retrieved from the IRIS DMC {stationServiceLink}, "
+        f"The metadata extents are retrieved from EarthScope {stationServiceLink}, "
         f"while the data extents (and gaps) "
-        f"are from the IRIS DMC  {availabilityServiceLink}. "
+        f"are from the EarthScope  {availabilityServiceLink}. "
         f"The gap tolerance used for this report is {tolerance} seconds.<br/><br/> "
         f"In addition, each channel lists the percent of data available, using the "
-        f'<a href="http://service.iris.edu/mustang/metrics/docs/1/desc/{availabilityType}/" '
+        f'<a href="http://service.earthscope.org/mustang/metrics/docs/1/desc/{availabilityType}/" '
         f'target="_blank">{availabilityType}</a> metric'
     )  # the punctuation at the end of this sentence depends on the metric
 
@@ -1800,39 +1877,55 @@ def doReport(
             f"{availabilityIntroText} <br/>Displaying all stations in the network.<br/>"
         )
 
-    try:
-        availabilityOutroText = "To view the availability numbers used to create the availability plot(s), see:"
+    if not services:
+        availabilityIntroText = (
+            f"{availabilityIntroText} <br/><br/>"
+            f"<b>Note:</b> the EarthScope availability service was unavailable when this report was generated, "
+            f"so the data-extent and gap plot(s) below could not be produced. Station selection above was "
+            f"still based on percent-availability metrics from MUSTANG.<br/>"
+        )
 
-        for service in services:
-            serviceLink = (
-                f"http://service.iris.edu/{service}/availability/1/query?format=text&"
-                f'net={network}&sta={stations}&loc={locations}&cha={",".join(chans)}&'
-                f"starttime={startDate}&endtime={endDate}&orderby=nslc_time_quality_samplerate&"
-                f"mergegaps={tolerance}&includerestricted=true&nodata=404"
+    if services:
+        try:
+            availabilityOutroText = "To view the availability numbers used to create the availability plot(s), see:"
+
+            for service in services:
+                serviceLink = (
+                    f"http://service.earthscope.org/{service}/availability/1/query?format=text&"
+                    f'net={network}&sta={stations}&loc={locations}&cha={",".join(chans)}&'
+                    f"starttime={startDate}&endtime={endDate}&orderby=nslc_time_quality_samplerate&"
+                    f"mergegaps={tolerance}&includerestricted=true&nodata=404"
+                )
+
+                availabilityOutroText = f'<br/>{availabilityOutroText} <br/><a href="{serviceLink}" target="_blank">{serviceLink}</a>'
+
+            availabilityOutroText = f"{availabilityOutroText}<br/><br/>To view the channel metadata time extents used, see: "
+
+            for service in services:
+                serviceLink = (
+                    f"http://service.earthscope.org/{service}/station/1/query?"
+                    f'net={network}&sta={stations}&loc={locations}&cha={",".join(chans)}&'
+                    f"starttime={startDate}&endtime={endDate}&level=channel&"
+                    f"format=text&includecomments=true&nodata=404"
+                )
+
+                availabilityOutroText = f'{availabilityOutroText}<br/><a href="{serviceLink}" target="_blank">{serviceLink}</a>'
+
+        except:
+            availabilityOutroText = (
+                "No availability was found for the selected channels."
             )
-
-            availabilityOutroText = f'<br/>{availabilityOutroText} <br/><a href="{serviceLink}" target="_blank">{serviceLink}</a>'
-
-        availabilityOutroText = f"{availabilityOutroText}<br/><br/>To view the channel metadata time extents used, see: "
-
-        for service in services:
-            serviceLink = (
-                f"http://service.iris.edu/{service}/station/1/query?"
-                f'net={network}&sta={stations}&loc={locations}&cha={",".join(chans)}&'
-                f"starttime={startDate}&endtime={endDate}&level=channel&"
-                f"format=text&includecomments=true&nodata=404"
-            )
-
-            availabilityOutroText = f'{availabilityOutroText}<br/><a href="{serviceLink}" target="_blank">{serviceLink}</a>'
-
-    except:
-        availabilityOutroText = "No availability was found for the selected channels."
+    else:
+        availabilityOutroText = (
+            "The availability service was unavailable when this report was generated, "
+            "so there are no availability/metadata query links to display for this section."
+        )
 
     ###### BOXPLOTS ######
     defaultMetricText = "The metrics presented here are"
     for metric in metricList:
         defaultMetricText = (
-            f'{defaultMetricText} <a href="http://service.iris.edu/mustang/metrics/docs/1/desc/{metric}/" '
+            f'{defaultMetricText} <a href="http://service.earthscope.org/mustang/metrics/docs/1/desc/{metric}/" '
             f'target="_blank">{metric}</a>,'
         )
         if metric == metricList[-2]:
@@ -1925,15 +2018,15 @@ def doReport(
     for metric in metricsWithPlots:
         if metric == "scale_corrected_sample_rms":
             metric = "sample_rms"
-        boxPlotIntroText3 = f'{boxPlotIntroText3}<li><a href="http://service.iris.edu/mustang/metrics/docs/1/desc/{metric}" target="_blank">{metric}</a></li>\n'
+        boxPlotIntroText3 = f'{boxPlotIntroText3}<li><a href="http://service.earthscope.org/mustang/metrics/docs/1/desc/{metric}" target="_blank">{metric}</a></li>\n'
 
     boxPlotIntroText3 = f"{boxPlotIntroText3} </ul>"
 
     ###### PDFS ######
     pdfPlotIntroText = (
         f"<p>This section contains Probability Density Function (PDF) plots calculated from Power Spectral Densities (PSD). The first two plots display PDFs "
-        f'for the stations with the highest and lowest median daily-RMS variance (<a href="http://service.iris.edu/mustang/metrics/docs/1/desc/sample_rms/" target="_blank">sample_rms</a>, scaled by metadata sensitivity), '
-        f'with an additional criteria that omits station-channels with less than 75% data availability (<a href="http://service.iris.edu/mustang/metrics/docs/1/desc/{availabilityType}/" '
+        f'for the stations with the highest and lowest median daily-RMS variance (<a href="http://service.earthscope.org/mustang/metrics/docs/1/desc/sample_rms/" target="_blank">sample_rms</a>, scaled by metadata sensitivity), '
+        f'with an additional criteria that omits station-channels with less than 75% data availability (<a href="http://service.earthscope.org/mustang/metrics/docs/1/desc/{availabilityType}/" '
         f'target="_blank">{availabilityType} metric</a>, '
         f"calculated between the first and last timestamp of the data for that channel), unless none of the stations have at least 75% availability. "
         f"These plots are intended to illustrate the range of characteristic noise levels across the experiment, avoiding stations with significant "
@@ -1941,7 +2034,7 @@ def doReport(
         f"errors. The third PDF is a composite plot of all stations for each channel set, giving an overview of the most common noise levels for the "
         f"experiment as a whole.</p>"
         f"<p>Detailed information about these PDF plots and how MUSTANG generates them "
-        f'can be found by visiting the <a href="http://service.iris.edu/mustang/noise-pdf/docs/1/help/" target="_blank">'
+        f'can be found by visiting the <a href="http://service.earthscope.org/mustang/noise-pdf/docs/1/help/" target="_blank">'
         f"noise-pdf web service</a>.</p>"
         f"Please note that you can also click the PDF Browser links below to access the MUSTANG PDF Browser, which allows you to view PDF plots "
         f"for all stations in the network on a total, annual, monthly, daily, or custom time period basis. Within the Browser, you can "
@@ -1952,7 +2045,7 @@ def doReport(
     spectrgramPlotIntoText = (
         f"<p>The daily-PDF-mode spectrogram plots in this section illustrate the power spectra values across time for two stations with high data "
         f"availability and continuity. For the purpose of showing potentially different station behavior, they are secondarily selected for "
-        f'differing median daily-RMS variance (<a href="http://service.iris.edu/mustang/metrics/docs/1/desc/sample_rms/" target="_blank">sample_rms</a> '
+        f'differing median daily-RMS variance (<a href="http://service.earthscope.org/mustang/metrics/docs/1/desc/sample_rms/" target="_blank">sample_rms</a> '
         f" metric, scaled by metadata sensitivity). For each channel group, the station selection steps are: "
         f"<ol>"
     )
@@ -1969,7 +2062,7 @@ def doReport(
     if splitPlots == 1:
         spectrgramPlotIntoText = (
             f"{spectrgramPlotIntoText}<li>Take the list of the {nTop} stations with the highest percent of data availability calculated over the entire requested "
-            f'report timespan (using <a href="http://service.iris.edu/mustang/metrics/docs/1/desc/{availabilityType}/" '
+            f'report timespan (using <a href="http://service.earthscope.org/mustang/metrics/docs/1/desc/{availabilityType}/" '
             f'target="_blank">{availabilityType}</a>, {spectAvailDescription}).</li>'
         )
     else:
@@ -1994,7 +2087,7 @@ def doReport(
 
     spectrgramPlotIntoText = (
         f"{spectrgramPlotIntoText}<p>Detailed information about these spectrogram plots and how MUSTANG "
-        f'generates them can be found by visiting the <a href="http://service.iris.edu/mustang/noise-spectrogram/'
+        f'generates them can be found by visiting the <a href="http://service.earthscope.org/mustang/noise-spectrogram/'
         f'docs/1/help/" target="_blank"> noise-spectrogram web service</a>.</p>'
         f"<p>Please note that you can also click the Spectrogram Browser links below to access the MUSTANG spectrogram "
         f"browser for each channel group below, which allows you to view spectrogram plots from all the stations in your network.</p>"
@@ -2011,7 +2104,7 @@ def doReport(
     ###### STATIONS ######
     stationIntroText = (
         f"Below is a list of stations, their locations, and start and end dates.  "
-        f"Clicking on any text from a station row will take you to the IRIS MetaData Aggregator "
+        f"Clicking on any text from a station row will take you to the EarthScope MetaData Aggregator "
         f'(<a href="http://ds.iris.edu/mda/" target="_blank">MDA</a>) '
         f"page for that station where you can view more detailed information about data epochs, "
         f"instrumentation, metadata changes, and virtual network affiliations.</p>\n"
@@ -2271,10 +2364,10 @@ def doReport(
         f.write("<h3>Explore the Metrics</h3>")
 
         f.write(
-            "<p>MUSTANG is the Quality Assurance system at the IRIS DMC. It contains around 45 metrics related to the quality of data in the archives there.\n\n"
+            "<p>MUSTANG is the Quality Assurance system at EarthScope. It contains around 45 metrics related to the quality of data in the archives there.\n\n"
         )
         f.write(
-            'The majority of metrics are available via the <a href="http://service.iris.edu/mustang/measurements/1/" target="_blank">measurements web service.</a>\n\n'
+            'The majority of metrics are available via the <a href="http://service.earthscope.org/mustang/measurements/1/" target="_blank">measurements web service.</a>\n\n'
         )
         f.write(
             'To learn more about the metrics, navigate to the measurements service Service Interface page and hit the red "Current List of all metrics" for a brief description and links to more detailed documentation.\n\n'
@@ -2293,7 +2386,7 @@ def doReport(
             if metric == "scale_corrected_sample_rms":
                 metric = "sample_rms"
             metricsLinks = (
-                f"http://service.iris.edu/mustang/measurements/1/query?metric={metric}"
+                f"http://service.earthscope.org/mustang/measurements/1/query?metric={metric}"
                 f"&network={network}&station={stations}&location={locations}&channel={channels}"
                 f"&start={startDate}&end={endDate}&format=text"
             )
@@ -2331,7 +2424,7 @@ def doReport(
                 nStations = 1
 
             pdfLink = (
-                f"http://service.iris.edu/mustang/noise-pdf-browser/1/gallery?"
+                f"http://service.earthscope.org/mustang/noise-pdf-browser/1/gallery?"
                 f"network={network}&channel={channel[0:2]}?&interval=all&"
                 f"starttime={startDate}&endtime={endDate}"
             )
@@ -2418,7 +2511,7 @@ def doReport(
                 spectPowerRange = ",".join([str(int) for int in userDefinedPowerRange])
 
             spectLink = (
-                f"http://service.iris.edu/mustang/noise-pdf-browser/1/spectrogram?"
+                f"http://service.earthscope.org/mustang/noise-pdf-browser/1/spectrogram?"
                 f"network={network}&channel={channel[0:2]}?&"
                 f"starttime={startDate}&endtime={endDate}&color.palette={spectColorPalette}&powerrange={spectPowerRange}"
             )
@@ -2594,7 +2687,7 @@ def main():
         --metric[s]=: comma-separated list of metrics to run for the boxplots; defaults: {','.join(metricList)}
         --maxplot=: number of stations to include in the boxplots; defaults to {nBoxPlotSta}
         --colorpalette=: color palette for spectrograms; defaults to '{spectColorPalette}'
-            options available at http://service.iris.edu/mustang/noise-spectrogram/1/
+            options available at http://service.earthscope.org/mustang/noise-spectrogram/1/
         --includeoutliers=: whether to include outliers in the boxplots, True/False; defaults to {includeOutliers}
         --spectralrange=: power range to use in the PDFs and spectrograms, comma separated values:  min,max; defaults depend on channel type
         --basemap=: the name of the basemap to be used for the map; defaults to '{basemap}'
@@ -2753,22 +2846,32 @@ def main():
     nTop = int(nBoxPlotSta / 2)
     nBottom = int(nBoxPlotSta - nTop)
 
+    # Check independently whether the ts_ (time-series) MUSTANG metrics exist right now -
+    # this can go down (or come back) on its own schedule, separate from the fdsnws-availability service
+    tsMetricsExist = reportUtils.checkTsMetricsExist(startDate, endDate)
+
     # Create Availability Plots
-    [topStationsDict, splitPlots, avFilesDictionary, services, availabilityType] = (
-        doAvailability(
-            splitPlots,
-            startDate,
-            endDate,
-            network,
-            stations,
-            locations,
-            channels,
-            nBoxPlotSta,
-            nTop,
-            nBottom,
-            tolerance,
-            imageDir,
-        )
+    [
+        topStationsDict,
+        splitPlots,
+        avFilesDictionary,
+        services,
+        availabilityType,
+        availabilityExistsByService,
+    ] = doAvailability(
+        splitPlots,
+        startDate,
+        endDate,
+        network,
+        stations,
+        locations,
+        channels,
+        nBoxPlotSta,
+        nTop,
+        nBottom,
+        tolerance,
+        imageDir,
+        tsMetricsExist,
     )
 
     # Create BoxPlots
@@ -2788,6 +2891,7 @@ def main():
             nBottom,
             includeOutliers,
             imageDir,
+            tsMetricsExist,
         )
     )
 
@@ -2806,6 +2910,8 @@ def main():
         network,
         stations,
         locations,
+        availabilityExistsByService,
+        tsMetricsExist,
     )
 
     # Create Spectrogram Plots
@@ -2821,6 +2927,8 @@ def main():
         powerRanges,
         spectColorPalette,
         imageDir,
+        availabilityExistsByService,
+        tsMetricsExist,
     )
 
     # Generate Station Map

@@ -1,9 +1,9 @@
 # PIQQA
 The PI's Quick Quality Assessment   
 
-PIQQA is python utility to create a simple Quality Assurance report. Developed by the IRIS DMC (now EarthScope), this tool is intended for use by the PASSCAL Instrument Center, meant to generate an easy-to-digest QA report for PIs after their experiment wraps.
+PIQQA is python utility to create a simple Quality Assurance report. Developed by EarthScope (formerly IRIS DMC), this tool is intended for use by the the EarthScope Primary Instrument Center (EPIC), meant to generate an easy-to-digest QA report for PIs after their experiment wraps.
 
-The command-line utility retrieves MUSTANG metrics, PDFs, and spectrograms, as well as metadata from the IRIS station service, putting them all together in a report.
+The command-line utility retrieves MUSTANG metrics, PDFs, and spectrograms, as well as metadata from the EarthScope station service, putting them all together in a report.
 
 The final report has 5 sections: Boxplots, PDFs, Spectrograms, Map, and Stations. 
 
@@ -71,7 +71,7 @@ perform installs, updates, or run PIQQA.
 ```
 cd piqqa
 conda update conda
-conda create --name piqqa python=3.9 -c conda-forge --file piqqa-conda-install.txt
+conda create --name piqqa python=3.12 -c conda-forge --file piqqa-conda-install.txt
 conda activate piqqa
 ```
 
@@ -122,7 +122,7 @@ Running PIQQA.py without any arguments, or with the -h/--h flags, will produce s
         --metrics=: comma-separated list of metrics to run for the boxplots; defaults: ts_channel_continuity,sample_rms,ts_num_gaps
         --maxplot=: number of stations to include in the boxplots; defaults to 30
         --colorpalette=: color palette for spectrograms; defaults to 'RdYlBu'
-            options available at http://service.iris.edu/mustang/noise-spectrogram/1/
+            options available at http://service.earthscope.org/mustang/noise-spectrogram/1/
         --includeoutliers=: whether to include outliers in the boxplots, True/False; defaults to False
         --spectralrange=: power range to use in the PDFs and spectrograms, comma separated values:  min, max; defaults depend on channel type
         --basemap=: the name of the basemap to be used for the map; defaults to 'stamen-terrain'
@@ -149,7 +149,7 @@ In addition to those fields, there are a number of optional fields.
 
 `maxplot` is how you can limit the number of stations displayed in the boxplots.
 
-`colorpalette` determines the color palette used in the PDFs and spectrograms, and a list of all options can be found in the service interface page for the [noise-spectrgram](http://service.iris.edu/mustang/noise-spectrogram/1/) service
+`colorpalette` determines the color palette used in the PDFs and spectrograms, and a list of all options can be found in the service interface page for the [noise-spectrgram](http://service.earthscope.org/mustang/noise-spectrogram/1/) service
 
 `includeoutliers` toggles the outliers on/off in the boxplots. Generally, it is easier to view the boxplots with the outliers turned off, but there may be cases where they should be displayed.
 
